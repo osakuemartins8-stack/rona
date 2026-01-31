@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="css/admin.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="js/admin.js"></script>
 </head>
 <body>
     <!-- Login Screen -->
@@ -29,8 +31,8 @@
                     <div id="login-error" class="error-message"></div>
                 </form>
                 <div class="login-info">
-                    <p>Don't have an account? Sign up in Supabase Auth, then run:</p>
-                    <code>UPDATE profiles SET is_admin = true WHERE id = 'your-user-id';</code>
+                    <p>First time? Create account in Supabase, then run:</p>
+                    <code>UPDATE profiles SET is_admin = true WHERE id = 'your-uuid';</code>
                 </div>
             </div>
         </div>
@@ -51,7 +53,7 @@
                     <span>➕</span> Add New
                 </a>
                 <a href="#" class="nav-item" onclick="showSection('profile', this)">
-                    <span>👤</span> Edit Profile
+                    <span>🎨</span> Edit Homepage
                 </a>
                 <a href="#" class="nav-item" onclick="showSection('cv', this)">
                     <span>📄</span> Edit CV
@@ -80,8 +82,8 @@
                     <div class="filters">
                         <select id="filter-type" onchange="filterContent()">
                             <option value="all">All Types</option>
-                            <option value="video">Videos</option>
-                            <option value="image">Images</option>
+                            <option value="video">Videos Only</option>
+                            <option value="image">Images Only</option>
                         </select>
                         <button class="btn-secondary" onclick="showSection('upload', document.querySelectorAll('.nav-item')[1])">
                             + Add New
@@ -90,7 +92,6 @@
                 </div>
                 
                 <div class="content-grid" id="content-grid">
-                    <!-- Content loads here -->
                     <div class="loading-state">Loading your content...</div>
                 </div>
             </section>
@@ -197,93 +198,167 @@
                 </div>
             </section>
 
-            <!-- PROFILE SECTION -->
+            <!-- SITE EDITOR SECTION -->
             <section id="profile-section" class="section">
                 <div class="settings-container">
-                    <h2>Edit Profile Section</h2>
-                    <p class="subtitle">Update your bio and profile image shown on the main page</p>
+                    <h2>🎨 Edit Homepage Content</h2>
+                    <p class="subtitle">Change every text, image, and link on your main website</p>
                     
-                    <form id="profile-form" onsubmit="handleProfileUpdate(event)">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Your Name</label>
-                                <input type="text" id="profile-name" placeholder="Your Name">
-                            </div>
-                            <div class="form-group">
-                                <label>Job Title</label>
-                                <input type="text" id="profile-title" placeholder="Content Creator & Social Media Strategist">
-                            </div>
-                        </div>
-
+                    <!-- Hero Section Editor -->
+                    <div class="editor-block">
+                        <h3>🎯 Hero Section (Top of page)</h3>
                         <div class="form-group">
-                            <label>Bio / About Me</label>
-                            <textarea id="profile-bio" rows="4" placeholder="Write a short bio..."></textarea>
-                            <small class="help-text">This appears in the About section of your portfolio</small>
+                            <label>Main Headline</label>
+                            <input type="text" id="site-hero-headline" placeholder="CREATIVE CONTENT">
                         </div>
-
+                        <div class="form-group">
+                            <label>Subtitle</label>
+                            <input type="text" id="site-hero-subtitle" placeholder="Social Media Strategist & Visual Storyteller">
+                        </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Profile Image URL</label>
-                                <input type="url" id="profile-image" placeholder="https://...">
-                                <small class="help-text">Leave empty to keep current image</small>
+                                <label>Primary Button Text</label>
+                                <input type="text" id="site-hero-cta1" placeholder="View My Work">
                             </div>
                             <div class="form-group">
-                                <label>Or Upload New Image</label>
-                                <input type="file" id="profile-image-file" accept="image/*" onchange="previewProfileImage(event)">
+                                <label>Secondary Button Text</label>
+                                <input type="text" id="site-hero-cta2" placeholder="Get In Touch">
                             </div>
                         </div>
+                    </div>
 
-                        <div id="profile-image-preview" class="image-preview-box hidden">
-                            <img src="" alt="Preview" id="profile-preview-img">
+                    <!-- About Section Editor -->
+                    <div class="editor-block">
+                        <h3>👤 About Section</h3>
+                        <div class="form-group">
+                            <label>Profile Image URL</label>
+                            <input type="url" id="site-about-image" placeholder="https://your-image-url.jpg">
+                            <small class="help-text">Paste a direct link to your photo (from Instagram, Imgur, Cloudinary, etc)</small>
                         </div>
+                        <div class="form-group">
+                            <label>Lead Text (Big text)</label>
+                            <textarea id="site-about-lead" rows="2" placeholder="I'm a passionate content creator..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Bio Paragraph</label>
+                            <textarea id="site-about-bio" rows="3" placeholder="With over 5 years of experience..."></textarea>
+                        </div>
+                    </div>
 
-                        <div class="form-actions">
-                            <button type="submit" class="btn-primary">Save Profile</button>
+                    <!-- Stats Editor -->
+                    <div class="editor-block">
+                        <h3>📊 Statistics (Below Bio)</h3>
+                        <div class="form-row three-col">
+                            <div class="form-group">
+                                <label>Number 1</label>
+                                <input type="text" id="site-stat-1" placeholder="50+">
+                                <input type="text" id="site-stat-1-label" placeholder="Brand Campaigns" style="margin-top: 0.5rem;">
+                            </div>
+                            <div class="form-group">
+                                <label>Number 2</label>
+                                <input type="text" id="site-stat-2" placeholder="10M+">
+                                <input type="text" id="site-stat-2-label" placeholder="Total Views" style="margin-top: 0.5rem;">
+                            </div>
+                            <div class="form-group">
+                                <label>Number 3</label>
+                                <input type="text" id="site-stat-3" placeholder="5">
+                                <input type="text" id="site-stat-3-label" placeholder="Years Experience" style="margin-top: 0.5rem;">
+                            </div>
                         </div>
-                    </form>
+                    </div>
+
+                    <!-- Social Links Editor -->
+                    <div class="editor-block">
+                        <h3>🔗 Social Media Links</h3>
+                        <div class="form-group">
+                            <label>Instagram URL</label>
+                            <input type="url" id="site-social-insta" placeholder="https://instagram.com/yourusername">
+                        </div>
+                        <div class="form-group">
+                            <label>TikTok URL</label>
+                            <input type="url" id="site-social-tiktok" placeholder="https://tiktok.com/@yourusername">
+                        </div>
+                        <div class="form-group">
+                            <label>LinkedIn URL</label>
+                            <input type="url" id="site-social-linkedin" placeholder="https://linkedin.com/in/yourusername">
+                        </div>
+                        <div class="form-group">
+                            <label>Email Address</label>
+                            <input type="email" id="site-social-email" placeholder="your@email.com">
+                            <small class="help-text">Just type the email, we'll add mailto: automatically</small>
+                        </div>
+                    </div>
+
+                    <!-- Contact Section Editor -->
+                    <div class="editor-block">
+                        <h3>📧 Contact Section</h3>
+                        <div class="form-group">
+                            <label>Headline</label>
+                            <input type="text" id="site-contact-headline" placeholder="Let's Create Something Amazing Together">
+                            <small class="help-text">Tip: The word "Amazing" will be highlighted in pink automatically</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Subtext</label>
+                            <input type="text" id="site-contact-subtext" placeholder="Open for collaborations...">
+                        </div>
+                    </div>
+
+                    <!-- Footer Editor -->
+                    <div class="editor-block">
+                        <h3>📝 Footer</h3>
+                        <div class="form-group">
+                            <label>Copyright Text</label>
+                            <input type="text" id="site-footer-copy" placeholder="© 2024 Creative Portfolio. All rights reserved.">
+                        </div>
+                    </div>
+
+                    <div class="form-actions" style="margin-top: 2rem; padding: 1.5rem; background: var(--accent-light); border-radius: 12px;">
+                        <button type="button" class="btn-secondary" onclick="loadSiteSettingsIntoForm()">🔄 Reset to Current</button>
+                        <button type="button" class="btn-primary" onclick="saveAllSiteSettings()">💾 Save All Changes</button>
+                    </div>
                 </div>
             </section>
 
-            <!-- CV SECTION -->
+            <!-- CV EDITOR SECTION -->
             <section id="cv-section" class="section">
                 <div class="settings-container">
-                    <h2>Edit CV / Experience</h2>
-                    <p class="subtitle">Update your work experience, skills, and resume details</p>
+                    <h2>📄 Edit CV & Experience</h2>
+                    <p class="subtitle">Update your work history, skills, and downloadable resume</p>
                     
-                    <form id="cv-form" onsubmit="handleCVUpdate(event)">
-                        <h3>Statistics</h3>
-                        <div class="form-row three-col">
-                            <div class="form-group">
-                                <label>Campaigns Count</label>
-                                <input type="text" id="stat-campaigns" placeholder="50+">
-                            </div>
-                            <div class="form-group">
-                                <label>Total Views</label>
-                                <input type="text" id="stat-views" placeholder="10M+">
-                            </div>
-                            <div class="form-group">
-                                <label>Years Experience</label>
-                                <input type="text" id="stat-years" placeholder="5">
-                            </div>
+                    <!-- Work Experience -->
+                    <div class="editor-block">
+                        <h3>💼 Work Experience</h3>
+                        <div id="cv-experience-list">
+                            <!-- Experience items loaded here -->
                         </div>
+                        <button type="button" class="btn-add" onclick="addExperienceItem()">+ Add Job Experience</button>
+                    </div>
 
-                        <h3 style="margin-top: 2rem;">Work Experience</h3>
-                        <div id="experience-list">
-                            <!-- Experience items added here dynamically -->
-                        </div>
-                        <button type="button" class="btn-add" onclick="addExperienceField()">+ Add Experience</button>
+                    <!-- Skills -->
+                    <div class="editor-block">
+                        <h3>🎨 Skills Categories</h3>
+                        <div id="cv-skills-list"></div>
+                        <button type="button" class="btn-add" onclick="addSkillCategory()">+ Add Skill Category</button>
+                    </div>
 
-                        <h3 style="margin-top: 2rem;">Downloadable CV</h3>
+                    <!-- CV Download -->
+                    <div class="editor-block">
+                        <h3>📥 CV Download</h3>
                         <div class="form-group">
                             <label>CV PDF URL</label>
-                            <input type="url" id="cv-url" placeholder="https://...">
-                            <small class="help-text">Upload your CV to cloud storage and paste link here</small>
+                            <input type="url" id="cv-download-url" placeholder="https://your-cv-link.pdf">
+                            <small class="help-text">Upload your CV to Google Drive, Dropbox, or any cloud storage and paste the public link here</small>
                         </div>
+                        <div class="form-group">
+                            <label>Button Text</label>
+                            <input type="text" id="cv-button-text" value="Download Full CV">
+                        </div>
+                    </div>
 
-                        <div class="form-actions" style="margin-top: 2rem;">
-                            <button type="submit" class="btn-primary">Save CV Changes</button>
-                        </div>
-                    </form>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="loadCVData()">🔄 Reset</button>
+                        <button type="button" class="btn-primary" onclick="saveCVData()">💾 Save CV Changes</button>
+                    </div>
                 </div>
             </section>
 
@@ -316,9 +391,9 @@
                         <input type="number" id="edit-order" min="0" value="0">
                         <small class="help-text">0 = first, 1 = second, etc.</small>
                     </div>
-                    <div class="form-group" style="display: flex; align-items: center; padding-top: 1.5rem;">
-                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                            <input type="checkbox" id="edit-active" style="width: auto;">
+                    <div class="form-group checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="edit-active">
                             <span>Visible on website</span>
                         </label>
                     </div>
@@ -331,8 +406,5 @@
             </form>
         </div>
     </div>
-
-    <script src="config.js"></script>
-    <script src="js/admin.js"></script>
 </body>
 </html>
