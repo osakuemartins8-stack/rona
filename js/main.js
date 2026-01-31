@@ -205,6 +205,25 @@ async function loadCVData() {
                 cvBtn.href = profile.cv_url;
                 cvBtn.target = '_blank';
             }
+            
+            // Update skills
+            const skillsContainer = document.getElementById('skills-container');
+            if (skillsContainer && cv.skills) {
+                let skillsHtml = '';
+                cv.skills.forEach(skillCategory => {
+                    skillsHtml += `
+                        <div class="skill-category">
+                            <h4>${skillCategory.category}</h4>
+                            <div class="skill-tags">
+                                ${skillCategory.items.split(',').map(skill => 
+                                    `<span>${skill.trim()}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    `;
+                });
+                skillsContainer.innerHTML = skillsHtml;
+            }
         }
         
     } catch (error) {
@@ -459,6 +478,36 @@ function loadFallbackCV() {
                     <h4>Senior Content Creator</h4>
                     <p class="company">Creative Agency</p>
                     <p>Add your experience in the admin panel.</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    const skillsContainer = document.getElementById('skills-container');
+    if (skillsContainer) {
+        skillsContainer.innerHTML = `
+            <div class="skill-category">
+                <h4>Video Production</h4>
+                <div class="skill-tags">
+                    <span>Premiere Pro</span>
+                    <span>After Effects</span>
+                    <span>Final Cut Pro</span>
+                </div>
+            </div>
+            <div class="skill-category">
+                <h4>Social Media</h4>
+                <div class="skill-tags">
+                    <span>Instagram</span>
+                    <span>TikTok</span>
+                    <span>YouTube</span>
+                </div>
+            </div>
+            <div class="skill-category">
+                <h4>Design Tools</h4>
+                <div class="skill-tags">
+                    <span>Photoshop</span>
+                    <span>Canva</span>
+                    <span>Figma</span>
                 </div>
             </div>
         `;
