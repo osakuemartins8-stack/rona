@@ -1,23 +1,61 @@
 // Admin Dashboard Logic
+let adminSupabase = null;
 let currentUser = null;
 let allContent = [];
 let selectedFile = null;
 
-// Check session on load
-document.addEventListener('DOMContentLoaded', () => {
-    checkSession();
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Supabase
+    setTimeout(() => {
+        if (typeof PortfolioConfig !== 'undefined') {
+            adminSupabase = PortfolioConfig.getSupabase();
+        } else if (window.supabase) {
+            adminSupabase = window.supabase.createClient(
+                'https://glnfhjudzdwetdloofvk.supabase.co',
+                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsbmZoanVkemR3ZXRkbG9vZnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3OTE2MzcsImV4cCI6MjA4NTM2NzYzN30.74j2K1FprAH4C3d_H3b588RcRPj39EKtSV1UUskNOW0'
+            );
+        }
+        
+        if (adminSupabase) {
+            console.log('Supabase initialized successfully');
+            checkSession();
+        } else {
+            console.error('Failed to initialize Supabase');
+            showError('Failed to connect to database. Please refresh.');
+        }
+    }, 100);
+    
     setupDropZone();
 });
 
 // Auth Functions
 async function checkSession() {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    
-    if (session) {
-        currentUser = session.user;
-        showDashboard();
-        loadContent();
-    } else {
+    try {
+        const { data: { session }, error } = await adminSupabase.auth.getSession();
+        
+        if (session) {
+            currentUser = session.user;
+            // Verify admin status
+            const { data: profile, error: profileError } = await adminSupabase
+                .from('profiles')
+                .select('is_admin')
+                .eq('id', currentUser.id)
+                .single();
+                
+            if (profileError || !profile?.is_admin) {
+                await adminSupabase.auth.signOut();
+                showLogin();
+                showError('Admin access only');
+            } else {
+                showDashboard();
+                loadContent();
+            }
+        } else {
+            showLogin();
+        }
+    } catch (error) {
+        console.error('Session check error:', error);
         showLogin();
     }
 }
@@ -27,9 +65,19 @@ async function handleLogin(e) {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const errorDiv = document.getElementById('login-error');
+    const btn = e.target.querySelector('button');
+    
+    if (!adminSupabase) {
+        errorDiv.textContent = 'Database not connected. Please refresh.';
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading"></span> Signing in...';
+    errorDiv.textContent = '';
     
     try {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await adminSupabase.auth.signInWithPassword({
             email,
             password
         });
@@ -37,14 +85,14 @@ async function handleLogin(e) {
         if (error) throw error;
         
         // Check if user is admin
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile, error: profileError } = await adminSupabase
             .from('profiles')
             .select('is_admin')
             .eq('id', data.user.id)
             .single();
             
         if (profileError || !profile?.is_admin) {
-            await supabase.auth.signOut();
+            await adminSupabase.auth.signOut();
             throw new Error('Unauthorized: Admin access only');
         }
         
@@ -53,13 +101,21 @@ async function handleLogin(e) {
         loadContent();
         
     } catch (error) {
-        errorDiv.textContent = error.message;
+        console.error('Login error:', error);
+        errorDiv.textContent = error.message || 'Login failed';
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
     }
 }
 
 async function handleLogout() {
-    await supabase.auth.signOut();
-    showLogin();
+    try {
+        await adminSupabase.auth.signOut();
+        currentUser = null;
+        showLogin();
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
 }
 
 function showLogin() {
@@ -70,8 +126,11 @@ function showLogin() {
 function showDashboard() {
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('dashboard').classList.remove('hidden');
-    document.getElementById('user-email').textContent = currentUser.email;
-    document.getElementById('user-avatar').textContent = currentUser.email[0];
+    document.getElementById('user-email').textContent = currentUser?.email || '';
+    const avatar = document.getElementById('user-avatar');
+    if (avatar && currentUser?.email) {
+        avatar.textContent = currentUser.email[0].toUpperCase();
+    }
 }
 
 // Navigation
@@ -91,8 +150,10 @@ function showSection(section) {
 
 // Content Management
 async function loadContent() {
+    if (!adminSupabase) return;
+    
     try {
-        const { data, error } = await supabase
+        const { data, error } = await adminSupabase
             .from('portfolio_content')
             .select('*')
             .order('order_index', { ascending: true });
@@ -110,6 +171,7 @@ async function loadContent() {
 
 function renderContentGrid(content) {
     const grid = document.getElementById('content-grid');
+    if (!grid) return;
     
     if (content.length === 0) {
         grid.innerHTML = `
@@ -130,11 +192,11 @@ function renderContentGrid(content) {
             <div class="content-card" data-id="${item.id}">
                 <div class="content-preview">
                     ${item.content_type === 'video' 
-                        ? `<img src="${thumbnail}" alt="${item.title}" onerror="this.src='https://via.placeholder.com/400x225?text=Video'">`
-                        : `<img src="${thumbnail}" alt="${item.title}" onerror="this.src='https://via.placeholder.com/400x225?text=Image'">`
+                        ? `<img src="${thumbnail}" alt="${item.title}" onerror="this.src='https://via.placeholder.com/400x225?text=Video'" loading="lazy">`
+                        : `<img src="${thumbnail}" alt="${item.title}" onerror="this.src='https://via.placeholder.com/400x225?text=Image'" loading="lazy">`
                     }
                     <span class="content-type-badge">${item.content_type}</span>
-                    ${!isActive ? '<span style="position: absolute; top: 0.75rem; left: 0.75rem; padding: 0.25rem 0.75rem; background: rgba(239, 68, 68, 0.9); border-radius: 20px; font-size: 0.75rem; font-weight: 600;">DRAFT</span>' : ''}
+                    ${!isActive ? '<span style="position: absolute; top: 0.75rem; left: 0.75rem; padding: 0.25rem 0.75rem; background: rgba(239, 68, 68, 0.9); border-radius: 20px; font-size: 0.75rem; font-weight: 600; color: white;">DRAFT</span>' : ''}
                 </div>
                 <div class="content-info">
                     <h3>${item.title}</h3>
@@ -163,13 +225,13 @@ function getThumbnailUrl(item) {
         if (item.source_type === 'url' && item.url) {
             if (item.url.includes('youtube')) {
                 const id = extractYouTubeId(item.url);
-                return `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
+                return id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : 'https://via.placeholder.com/400x225?text=Video';
             }
         }
         return 'https://via.placeholder.com/400x225?text=Video';
     } else {
         if (item.source_type === 'storage' && item.storage_path) {
-            return `${SUPABASE_URL}/storage/v1/object/public/portfolio-media/${item.storage_path}`;
+            return `https://glnfhjudzdwetdloofvk.supabase.co/storage/v1/object/public/portfolio-media/${item.storage_path}`;
         }
         return item.url || 'https://via.placeholder.com/400x225?text=Image';
     }
@@ -211,12 +273,17 @@ function toggleLinkPlaceholder() {
 
 async function handleLinkSubmit(e) {
     e.preventDefault();
+    if (!adminSupabase) {
+        showError('Database not connected');
+        return;
+    }
+    
     const btn = e.target.querySelector('button');
     btn.disabled = true;
     btn.innerHTML = '<span class="loading"></span> Adding...';
     
     try {
-        const { data, error } = await supabase
+        const { data, error } = await adminSupabase
             .from('portfolio_content')
             .insert([
                 {
@@ -248,6 +315,7 @@ async function handleLinkSubmit(e) {
 // File Upload
 function setupDropZone() {
     const dropZone = document.getElementById('drop-zone');
+    if (!dropZone) return;
     
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropZone.addEventListener(eventName, preventDefaults, false);
@@ -261,7 +329,7 @@ function setupDropZone() {
     ['dragenter', 'dragover'].forEach(eventName => {
         dropZone.addEventListener(eventName, () => {
             dropZone.style.borderColor = 'var(--accent)';
-            dropZone.style.background = 'rgba(59, 130, 246, 0.1)';
+            dropZone.style.background = 'rgba(255, 143, 163, 0.05)';
         });
     });
     
@@ -286,7 +354,6 @@ function handleFileSelect(e) {
 }
 
 function handleFile(file) {
-    // Validate file size (50MB limit for videos, 10MB for images)
     const maxSize = file.type.startsWith('video/') ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
     
     if (file.size > maxSize) {
@@ -296,6 +363,8 @@ function handleFile(file) {
     
     selectedFile = file;
     const preview = document.getElementById('file-preview');
+    if (!preview) return;
+    
     preview.classList.remove('hidden');
     
     if (file.type.startsWith('image/')) {
@@ -321,6 +390,11 @@ function handleFile(file) {
 async function handleFileSubmit(e) {
     e.preventDefault();
     
+    if (!adminSupabase) {
+        showError('Database not connected');
+        return;
+    }
+    
     if (!selectedFile) {
         showError('Please select a file');
         return;
@@ -340,14 +414,14 @@ async function handleFileSubmit(e) {
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `${document.getElementById('file-type').value}s/${fileName}`;
         
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await adminSupabase.storage
             .from('portfolio-media')
             .upload(filePath, selectedFile);
             
         if (uploadError) throw uploadError;
         
         // Save to database
-        const { error: dbError } = await supabase
+        const { error: dbError } = await adminSupabase
             .from('portfolio_content')
             .insert([
                 {
@@ -398,9 +472,10 @@ function closeModal() {
 
 async function handleEditSubmit(e) {
     e.preventDefault();
+    if (!adminSupabase) return;
     
     try {
-        const { error } = await supabase
+        const { error } = await adminSupabase
             .from('portfolio_content')
             .update({
                 title: document.getElementById('edit-title').value,
@@ -422,8 +497,10 @@ async function handleEditSubmit(e) {
 }
 
 async function toggleActive(id, active) {
+    if (!adminSupabase) return;
+    
     try {
-        const { error } = await supabase
+        const { error } = await adminSupabase
             .from('portfolio_content')
             .update({ is_active: active })
             .eq('id', id);
@@ -438,17 +515,18 @@ async function toggleActive(id, active) {
 
 async function deleteContent(id) {
     if (!confirm('Are you sure you want to delete this content? This action cannot be undone.')) return;
+    if (!adminSupabase) return;
     
     try {
         // If it's a stored file, delete from storage too
         const item = allContent.find(c => c.id === id);
         if (item?.source_type === 'storage' && item.storage_path) {
-            await supabase.storage
+            await adminSupabase.storage
                 .from('portfolio-media')
                 .remove([item.storage_path]);
         }
         
-        const { error } = await supabase
+        const { error } = await adminSupabase
             .from('portfolio_content')
             .delete()
             .eq('id', id);
@@ -470,7 +548,6 @@ function extractYouTubeId(url) {
 }
 
 function showError(message) {
-    // Simple alert for now - replace with toast notification
     alert('Error: ' + message);
 }
 
