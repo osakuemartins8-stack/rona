@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard | Portfolio Manager</title>
     <link rel="stylesheet" href="css/admin.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -13,20 +13,24 @@
     <div id="login-screen" class="login-screen">
         <div class="login-container">
             <div class="login-box">
-                <h1>Admin Login</h1>
-                <p>Enter your credentials to manage content</p>
+                <div class="login-logo">✨ Admin Panel</div>
+                <h1>Welcome Back</h1>
+                <p>Sign in to manage your portfolio</p>
                 <form id="login-form" onsubmit="handleLogin(event)">
                     <div class="form-group">
-                        <input type="email" id="email" placeholder="Email" required>
+                        <label>Email Address</label>
+                        <input type="email" id="email" placeholder="your@email.com" required>
                     </div>
                     <div class="form-group">
-                        <input type="password" id="password" placeholder="Password" required>
+                        <label>Password</label>
+                        <input type="password" id="password" placeholder="••••••••" required>
                     </div>
                     <button type="submit" class="btn-primary">Sign In</button>
                     <div id="login-error" class="error-message"></div>
                 </form>
                 <div class="login-info">
-                    <p>First time? Use the Supabase Auth panel to create an account, then run SQL to set is_admin = true</p>
+                    <p>Don't have an account? Sign up in Supabase Auth, then run:</p>
+                    <code>UPDATE profiles SET is_admin = true WHERE id = 'your-user-id';</code>
                 </div>
             </div>
         </div>
@@ -37,17 +41,20 @@
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h2>Portfolio Admin</h2>
+                <div class="logo">✨ Portfolio Admin</div>
             </div>
             <nav class="sidebar-nav">
-                <a href="#" class="nav-item active" onclick="showSection('content')">
-                    <span>📁</span> Content
+                <a href="#" class="nav-item active" onclick="showSection('content', this)">
+                    <span>📁</span> My Content
                 </a>
-                <a href="#" class="nav-item" onclick="showSection('upload')">
-                    <span>⬆️</span> Upload New
+                <a href="#" class="nav-item" onclick="showSection('upload', this)">
+                    <span>➕</span> Add New
                 </a>
-                <a href="#" class="nav-item" onclick="showSection('settings')">
-                    <span>⚙️</span> Settings
+                <a href="#" class="nav-item" onclick="showSection('profile', this)">
+                    <span>👤</span> Edit Profile
+                </a>
+                <a href="#" class="nav-item" onclick="showSection('cv', this)">
+                    <span>📄</span> Edit CV
                 </a>
                 <a href="#" class="nav-item logout" onclick="handleLogout()">
                     <span>🚪</span> Logout
@@ -59,14 +66,14 @@
         <main class="main-content">
             <!-- Header -->
             <header class="dashboard-header">
-                <h1>Content Management</h1>
+                <h1 id="page-title">Content Management</h1>
                 <div class="user-info">
                     <span id="user-email"></span>
                     <div class="avatar" id="user-avatar"></div>
                 </div>
             </header>
 
-            <!-- Content List Section -->
+            <!-- CONTENT LIST SECTION -->
             <section id="content-section" class="section active">
                 <div class="section-header">
                     <h2>All Content</h2>
@@ -76,135 +83,251 @@
                             <option value="video">Videos</option>
                             <option value="image">Images</option>
                         </select>
+                        <button class="btn-secondary" onclick="showSection('upload', document.querySelectorAll('.nav-item')[1])">
+                            + Add New
+                        </button>
                     </div>
                 </div>
                 
                 <div class="content-grid" id="content-grid">
-                    <!-- Content items loaded here -->
+                    <!-- Content loads here -->
+                    <div class="loading-state">Loading your content...</div>
                 </div>
             </section>
 
-            <!-- Upload Section -->
+            <!-- UPLOAD SECTION -->
             <section id="upload-section" class="section">
-                <div class="upload-container">
+                <div class="upload-wrapper">
                     <h2>Add New Content</h2>
+                    <p class="subtitle">Add videos or images to showcase on your portfolio</p>
                     
                     <div class="upload-tabs">
-                        <button class="tab-btn active" onclick="switchTab('link')">External Link</button>
-                        <button class="tab-btn" onclick="switchTab('upload')">Upload File</button>
+                        <button class="tab-btn active" onclick="switchTab('link')">🔗 External Link</button>
+                        <button class="tab-btn" onclick="switchTab('upload')">📤 Upload File</button>
                     </div>
 
-                    <!-- Link Form -->
+                    <!-- LINK FORM -->
                     <form id="link-form" class="upload-form" onsubmit="handleLinkSubmit(event)">
-                        <div class="form-group">
-                            <label>Content Type</label>
-                            <select id="link-type" required onchange="toggleLinkPlaceholder()">
-                                <option value="video">Video</option>
-                                <option value="image">Image</option>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Title</label>
-                            <input type="text" id="link-title" required placeholder="Enter content title">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Content Type *</label>
+                                <select id="link-type" required onchange="toggleLinkPlaceholder()">
+                                    <option value="video">Video (YouTube, Vimeo, etc)</option>
+                                    <option value="image">Image (URL)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Title *</label>
+                                <input type="text" id="link-title" required placeholder="My Awesome Video">
+                            </div>
                         </div>
 
                         <div class="form-group">
                             <label>Description</label>
-                            <textarea id="link-description" rows="3" placeholder="Brief description"></textarea>
+                            <textarea id="link-description" rows="2" placeholder="Brief description of this content..."></textarea>
                         </div>
 
                         <div class="form-group">
-                            <label>URL (YouTube, Vimeo, or direct link)</label>
-                            <input type="url" id="link-url" required placeholder="https://...">
-                            <small class="help-text" id="link-help">Supports YouTube, Vimeo, or direct video links</small>
+                            <label>URL Link *</label>
+                            <input type="url" id="link-url" required placeholder="https://youtube.com/watch?v=..." oninput="previewLink()">
+                            <small class="help-text" id="link-help">Paste YouTube, Vimeo, or any video link. For images, paste direct image URL.</small>
                         </div>
 
                         <div class="form-group">
                             <label>Thumbnail URL (optional)</label>
                             <input type="url" id="link-thumbnail" placeholder="https://...">
+                            <small class="help-text">Leave empty to auto-generate from YouTube/Vimeo</small>
                         </div>
 
-                        <button type="submit" class="btn-primary">Add Content</button>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="showSection('content', document.querySelectorAll('.nav-item')[0])">Cancel</button>
+                            <button type="submit" class="btn-primary">Add Content</button>
+                        </div>
                     </form>
 
-                    <!-- Upload Form -->
+                    <!-- FILE UPLOAD FORM -->
                     <form id="file-form" class="upload-form hidden" onsubmit="handleFileSubmit(event)">
-                        <div class="form-group">
-                            <label>Content Type</label>
-                            <select id="file-type" required>
-                                <option value="image">Image</option>
-                                <option value="video">Video (Small files only, <50MB)</option>
-                            </select>
-                            <small class="help-text">For videos >50MB, use External Link tab with YouTube/Vimeo</small>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Title</label>
-                            <input type="text" id="file-title" required placeholder="Enter content title">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Content Type *</label>
+                                <select id="file-type" required onchange="updateFileAccept()">
+                                    <option value="image">Image (JPG, PNG, GIF)</option>
+                                    <option value="video">Video (MP4, MOV)</option>
+                                </select>
+                                <small class="help-text">Max video size: 50MB. For larger videos, use External Link tab.</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Title *</label>
+                                <input type="text" id="file-title" required placeholder="My Upload">
+                            </div>
                         </div>
 
                         <div class="form-group">
                             <label>Description</label>
-                            <textarea id="file-description" rows="3" placeholder="Brief description"></textarea>
+                            <textarea id="file-description" rows="2" placeholder="Brief description..."></textarea>
                         </div>
 
                         <div class="form-group">
-                            <label>File</label>
+                            <label>Choose File *</label>
                             <div class="file-drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
                                 <input type="file" id="file-input" hidden accept="image/*,video/*" onchange="handleFileSelect(event)">
                                 <div class="drop-content">
-                                    <span class="drop-icon">📁</span>
-                                    <p>Click to upload or drag and drop</p>
-                                    <small>Images: JPG, PNG, GIF | Videos: MP4 (max 50MB)</small>
+                                    <span class="drop-icon">☁️</span>
+                                    <p><strong>Click to upload</strong> or drag and drop</p>
+                                    <small>Images: up to 10MB | Videos: up to 50MB</small>
                                 </div>
                             </div>
-                            <div id="file-preview" class="file-preview hidden"></div>
+                            <div id="file-preview" class="file-preview hidden">
+                                <div class="preview-header">
+                                    <span>📎 Selected File</span>
+                                    <button type="button" class="btn-icon" onclick="clearFile()">✕</button>
+                                </div>
+                                <div id="preview-content"></div>
+                            </div>
                         </div>
 
-                        <button type="submit" class="btn-primary" id="upload-btn">
-                            <span class="btn-text">Upload Content</span>
-                            <span class="loading hidden"></span>
-                        </button>
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" onclick="showSection('content', document.querySelectorAll('.nav-item')[0])">Cancel</button>
+                            <button type="submit" class="btn-primary" id="upload-btn">
+                                <span class="btn-text">Upload Now</span>
+                                <span class="loading hidden"></span>
+                            </button>
+                        </div>
                     </form>
                 </div>
             </section>
 
-            <!-- Settings Section -->
-            <section id="settings-section" class="section">
+            <!-- PROFILE SECTION -->
+            <section id="profile-section" class="section">
                 <div class="settings-container">
-                    <h2>Profile Settings</h2>
-                    <p>Update your portfolio information here (feature coming soon)</p>
+                    <h2>Edit Profile Section</h2>
+                    <p class="subtitle">Update your bio and profile image shown on the main page</p>
+                    
+                    <form id="profile-form" onsubmit="handleProfileUpdate(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Your Name</label>
+                                <input type="text" id="profile-name" placeholder="Your Name">
+                            </div>
+                            <div class="form-group">
+                                <label>Job Title</label>
+                                <input type="text" id="profile-title" placeholder="Content Creator & Social Media Strategist">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Bio / About Me</label>
+                            <textarea id="profile-bio" rows="4" placeholder="Write a short bio..."></textarea>
+                            <small class="help-text">This appears in the About section of your portfolio</small>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Profile Image URL</label>
+                                <input type="url" id="profile-image" placeholder="https://...">
+                                <small class="help-text">Leave empty to keep current image</small>
+                            </div>
+                            <div class="form-group">
+                                <label>Or Upload New Image</label>
+                                <input type="file" id="profile-image-file" accept="image/*" onchange="previewProfileImage(event)">
+                            </div>
+                        </div>
+
+                        <div id="profile-image-preview" class="image-preview-box hidden">
+                            <img src="" alt="Preview" id="profile-preview-img">
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">Save Profile</button>
+                        </div>
+                    </form>
                 </div>
             </section>
+
+            <!-- CV SECTION -->
+            <section id="cv-section" class="section">
+                <div class="settings-container">
+                    <h2>Edit CV / Experience</h2>
+                    <p class="subtitle">Update your work experience, skills, and resume details</p>
+                    
+                    <form id="cv-form" onsubmit="handleCVUpdate(event)">
+                        <h3>Statistics</h3>
+                        <div class="form-row three-col">
+                            <div class="form-group">
+                                <label>Campaigns Count</label>
+                                <input type="text" id="stat-campaigns" placeholder="50+">
+                            </div>
+                            <div class="form-group">
+                                <label>Total Views</label>
+                                <input type="text" id="stat-views" placeholder="10M+">
+                            </div>
+                            <div class="form-group">
+                                <label>Years Experience</label>
+                                <input type="text" id="stat-years" placeholder="5">
+                            </div>
+                        </div>
+
+                        <h3 style="margin-top: 2rem;">Work Experience</h3>
+                        <div id="experience-list">
+                            <!-- Experience items added here dynamically -->
+                        </div>
+                        <button type="button" class="btn-add" onclick="addExperienceField()">+ Add Experience</button>
+
+                        <h3 style="margin-top: 2rem;">Downloadable CV</h3>
+                        <div class="form-group">
+                            <label>CV PDF URL</label>
+                            <input type="url" id="cv-url" placeholder="https://...">
+                            <small class="help-text">Upload your CV to cloud storage and paste link here</small>
+                        </div>
+
+                        <div class="form-actions" style="margin-top: 2rem;">
+                            <button type="submit" class="btn-primary">Save CV Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
         </main>
     </div>
 
     <!-- Edit Modal -->
     <div id="edit-modal" class="modal hidden">
         <div class="modal-content">
-            <span class="close-btn" onclick="closeModal()">&times;</span>
-            <h2>Edit Content</h2>
+            <div class="modal-header">
+                <h2>Edit Content</h2>
+                <button class="close-btn" onclick="closeModal()">✕</button>
+            </div>
             <form id="edit-form" onsubmit="handleEditSubmit(event)">
                 <input type="hidden" id="edit-id">
+                
                 <div class="form-group">
                     <label>Title</label>
                     <input type="text" id="edit-title" required>
                 </div>
+
                 <div class="form-group">
                     <label>Description</label>
                     <textarea id="edit-description" rows="3"></textarea>
                 </div>
-                <div class="form-group">
-                    <label>Order Index (0 = first)</label>
-                    <input type="number" id="edit-order" min="0">
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Display Order</label>
+                        <input type="number" id="edit-order" min="0" value="0">
+                        <small class="help-text">0 = first, 1 = second, etc.</small>
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: center; padding-top: 1.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="edit-active" style="width: auto;">
+                            <span>Visible on website</span>
+                        </label>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="edit-active"> Active (visible on site)
-                    </label>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Save Changes</button>
                 </div>
-                <button type="submit" class="btn-primary">Save Changes</button>
             </form>
         </div>
     </div>
