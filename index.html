@@ -3,19 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Creative Portfolio | Content Creator</title>
+    <title>Creative Portfolio | Loading...</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+    <div id="loading-screen" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--primary-bg); display: flex; align-items: center; justify-content: center; z-index: 9999;">
+        <div style="text-align: center;">
+            <div class="loading" style="width: 40px; height: 40px; border-width: 4px; border-color: var(--accent); border-top-color: transparent; margin: 0 auto 1rem;"></div>
+            <p style="color: var(--text-secondary); font-style: italic;">Loading portfolio...</p>
+        </div>
+    </div>
+
     <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
-            <div class="logo">PORTFOLIO</div>
+            <div class="logo" id="nav-logo">PORTFOLIO</div>
             <ul class="nav-links">
                 <li><a href="#home">Home</a></li>
                 <li><a href="#about">About</a></li>
@@ -35,11 +41,11 @@
     <section id="home" class="hero">
         <div class="hero-content">
             <div class="hero-text">
-                <h1 class="glitch" data-text="CREATIVE CONTENT">CREATIVE CONTENT</h1>
-                <p class="subtitle">Social Media Strategist & Visual Storyteller</p>
+                <h1 class="glitch" id="hero-headline" data-text="CREATIVE CONTENT">CREATIVE CONTENT</h1>
+                <p class="subtitle" id="hero-subtitle">Loading...</p>
                 <div class="hero-cta">
-                    <a href="#work" class="btn-primary">View My Work</a>
-                    <a href="#contact" class="btn-secondary">Get In Touch</a>
+                    <a href="#work" class="btn-primary" id="hero-cta-primary">View My Work</a>
+                    <a href="#contact" class="btn-secondary" id="hero-cta-secondary">Get In Touch</a>
                 </div>
             </div>
             <div class="hero-visual">
@@ -65,26 +71,15 @@
             </div>
             <div class="about-content">
                 <div class="about-text">
-                    <p class="lead">I'm a passionate content creator specializing in social media strategy, video production, and brand storytelling.</p>
-                    <p>With over 5 years of experience in digital marketing, I've helped brands grow their online presence through engaging visual content. My expertise spans across TikTok, Instagram, YouTube, and emerging platforms.</p>
-                    <div class="stats">
-                        <div class="stat-item">
-                            <span class="stat-number">50+</span>
-                            <span class="stat-label">Brand Campaigns</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-number">10M+</span>
-                            <span class="stat-label">Total Views</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-number">5</span>
-                            <span class="stat-label">Years Experience</span>
-                        </div>
+                    <p class="lead" id="about-lead">Loading...</p>
+                    <p id="about-bio">Loading...</p>
+                    <div class="stats" id="stats-container">
+                        <!-- Stats loaded dynamically -->
                     </div>
                 </div>
                 <div class="about-image">
                     <div class="image-wrapper">
-                        <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600" alt="Profile">
+                        <img src="" alt="Profile" id="profile-image">
                         <div class="image-overlay"></div>
                     </div>
                 </div>
@@ -105,9 +100,7 @@
                 <h3 class="block-title">Video Content <span class="arrow">→</span></h3>
                 <div class="slider-container" id="video-slider">
                     <button class="slider-btn prev" onclick="slideContent('video', -1)">←</button>
-                    <div class="slider-track" id="video-track">
-                        <!-- Videos loaded dynamically -->
-                    </div>
+                    <div class="slider-track" id="video-track"></div>
                     <button class="slider-btn next" onclick="slideContent('video', 1)">→</button>
                 </div>
                 <div class="slider-dots" id="video-dots"></div>
@@ -118,9 +111,7 @@
                 <h3 class="block-title">Visual Content <span class="arrow">→</span></h3>
                 <div class="slider-container" id="image-slider">
                     <button class="slider-btn prev" onclick="slideContent('image', -1)">←</button>
-                    <div class="slider-track" id="image-track">
-                        <!-- Images loaded dynamically -->
-                    </div>
+                    <div class="slider-track" id="image-track"></div>
                     <button class="slider-btn next" onclick="slideContent('image', 1)">→</button>
                 </div>
                 <div class="slider-dots" id="image-dots"></div>
@@ -139,70 +130,18 @@
             <div class="cv-grid">
                 <div class="cv-column">
                     <h3 class="cv-title">Experience</h3>
-                    <div class="timeline">
-                        <div class="timeline-item">
-                            <div class="timeline-marker"></div>
-                            <div class="timeline-content">
-                                <span class="timeline-date">2022 - Present</span>
-                                <h4>Senior Content Creator</h4>
-                                <p class="company">Creative Agency X</p>
-                                <p>Leading social media strategy for Fortune 500 brands. Managed content calendars and video production.</p>
-                            </div>
-                        </div>
-                        <div class="timeline-item">
-                            <div class="timeline-marker"></div>
-                            <div class="timeline-content">
-                                <span class="timeline-date">2020 - 2022</span>
-                                <h4>Social Media Manager</h4>
-                                <p class="company">Digital Studio Y</p>
-                                <p>Grew Instagram following from 10K to 500K in 18 months through viral content strategies.</p>
-                            </div>
-                        </div>
-                        <div class="timeline-item">
-                            <div class="timeline-marker"></div>
-                            <div class="timeline-content">
-                                <span class="timeline-date">2019 - 2020</span>
-                                <h4>Content Coordinator</h4>
-                                <p class="company">Media Company Z</p>
-                                <p>Produced daily content for multiple platforms and analyzed performance metrics.</p>
-                            </div>
-                        </div>
+                    <div class="timeline" id="cv-timeline">
+                        <!-- Experience loaded dynamically -->
                     </div>
                 </div>
 
                 <div class="cv-column">
                     <h3 class="cv-title">Skills & Tools</h3>
-                    <div class="skills-grid">
-                        <div class="skill-category">
-                            <h4>Content Creation</h4>
-                            <div class="skill-tags">
-                                <span>Video Editing</span>
-                                <span>Copywriting</span>
-                                <span>Photography</span>
-                                <span>Motion Graphics</span>
-                            </div>
-                        </div>
-                        <div class="skill-category">
-                            <h4>Platforms</h4>
-                            <div class="skill-tags">
-                                <span>Instagram</span>
-                                <span>TikTok</span>
-                                <span>YouTube</span>
-                                <span>LinkedIn</span>
-                            </div>
-                        </div>
-                        <div class="skill-category">
-                            <h4>Tools</h4>
-                            <div class="skill-tags">
-                                <span>Adobe Creative Suite</span>
-                                <span>Final Cut Pro</span>
-                                <span>Canva</span>
-                                <span>Analytics Tools</span>
-                            </div>
-                        </div>
+                    <div class="skills-grid" id="skills-container">
+                        <!-- Skills loaded dynamically -->
                     </div>
                     
-                    <a href="#" class="download-cv" onclick="downloadCV()">
+                    <a href="#" class="download-cv" id="cv-download-btn">
                         <span>Download Full CV</span>
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -220,13 +159,10 @@
         <div class="container">
             <div class="contact-content">
                 <div class="contact-text">
-                    <h2>Let's Create Something <span class="highlight">Amazing</span> Together</h2>
-                    <p>Open for collaborations, freelance projects, and full-time opportunities.</p>
-                    <div class="social-links">
-                        <a href="#" class="social-link">Instagram</a>
-                        <a href="#" class="social-link">TikTok</a>
-                        <a href="#" class="social-link">LinkedIn</a>
-                        <a href="#" class="social-link">Email</a>
+                    <h2 id="contact-headline">Let's Create Something <span class="highlight">Amazing</span> Together</h2>
+                    <p id="contact-subtext">Loading...</p>
+                    <div class="social-links" id="social-links-container">
+                        <!-- Social links loaded dynamically -->
                     </div>
                 </div>
                 <div class="contact-form-wrapper">
@@ -249,7 +185,7 @@
 
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2024 Creative Portfolio. All rights reserved.</p>
+            <p id="footer-copyright">© 2024 Creative Portfolio. All rights reserved.</p>
             <a href="admin.html" class="admin-link">Admin Login</a>
         </div>
     </footer>
