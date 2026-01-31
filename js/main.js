@@ -9,14 +9,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     const loadingScreen = document.getElementById('loading-screen');
     
     try {
-        // Initialize Supabase
-        if (typeof PortfolioConfig !== 'undefined') {
-            supabase = PortfolioConfig.getSupabase();
-        } else if (window.supabase) {
-            supabase = window.supabase.createClient(
-                'https://glnfhjudzdwetdloofvk.supabase.co',
-                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsbmZoanVkemR3ZXRkbG9vZnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3OTE2MzcsImV4cCI6MjA4NTM2NzYzN30.74j2K1FprAH4C3d_H3b588RcRPj39EKtSV1UUskNOW0'
-            );
+                // Supabase already initialized in config.js
+        if (!supabase) {
+            console.error('Supabase not loaded');
+            return;
         }
 
         // Load all site data
@@ -525,4 +521,5 @@ window.addEventListener('resize', () => {
     updateSlider('video', 0);
     updateSlider('image', 0);
 });
+
 
