@@ -1,10 +1,13 @@
 // Site Configuration
 let siteData = {};
-// supabase is already defined in config.js, just reference it
-const supabase = window.supabaseClient || window.supabase;
+// Get supabase client from window (initialized in config.js)
+let supabase;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async function() {
+    // Get Supabase client from window
+    supabase = window.supabaseClient;
+    
     // Show loading
     const loadingScreen = document.getElementById('loading-screen');
     
