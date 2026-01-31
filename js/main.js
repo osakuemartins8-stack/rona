@@ -1,19 +1,14 @@
 // Site Configuration
 let siteData = {};
-// Get supabase client from window (initialized in config.js)
-let supabase;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async function() {
-    // Get Supabase client from window
-    supabase = window.supabaseClient;
-    
     // Show loading
     const loadingScreen = document.getElementById('loading-screen');
     
     try {
         // Supabase already initialized in config.js
-        if (!supabase) {
+        if (!window.supabaseClient) {
             console.error('Supabase not loaded');
             loadFallbackData();
             if (loadingScreen) loadingScreen.remove();
@@ -47,7 +42,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 // Load Site Settings
 async function loadSiteSettings() {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await window.supabaseClient
             .from('site_settings')
             .select('*');
             
@@ -174,7 +169,7 @@ function applySiteData() {
 async function loadCVData() {
     try {
         // Try to load from profiles or cv_data table
-        const { data: profile } = await supabase
+        const { data: profile } = await window.supabaseClient
             .from('profiles')
             .select('*')
             .limit(1)
@@ -226,7 +221,7 @@ let imageItems = [];
 
 async function loadPortfolioContent() {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await window.supabaseClient
             .from('portfolio_content')
             .select('*')
             .eq('is_active', true)
