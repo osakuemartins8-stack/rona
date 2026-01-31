@@ -97,8 +97,12 @@ function applySiteData() {
         if (profileImg && siteData.about.profile_image) {
             profileImg.src = siteData.about.profile_image;
             profileImg.onerror = function() {
-                this.src = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600';
+                // Hide image if it fails to load
+                this.style.display = 'none';
             };
+        } else if (profileImg) {
+            // No image set - hide the image element
+            profileImg.style.display = 'none';
         }
     }
     
@@ -266,7 +270,14 @@ function renderVideos() {
     if (!track) return;
 
     if (videoItems.length === 0) {
-        track.innerHTML = '<div class="content-item"><div class="content-info"><h4>No videos yet</h4><p>Check back soon!</p></div></div>';
+        track.innerHTML = `
+            <div class="content-item" style="background: transparent; border: 2px dashed var(--border); text-align: center; padding: 3rem;">
+                <div class="content-info">
+                    <h4 style="color: var(--text-secondary);">No videos yet</h4>
+                    <p style="color: var(--text-secondary);">Add your first video in the admin panel!</p>
+                </div>
+            </div>
+        `;
         return;
     }
 
@@ -307,7 +318,14 @@ function renderImages() {
     if (!track) return;
 
     if (imageItems.length === 0) {
-        track.innerHTML = '<div class="content-item"><div class="image-container"><img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600" alt="Placeholder"></div><div class="content-info"><h4>Summer Collection</h4><p>Coming soon</p></div></div>';
+        track.innerHTML = `
+            <div class="content-item" style="background: transparent; border: 2px dashed var(--border); text-align: center; padding: 3rem;">
+                <div class="content-info">
+                    <h4 style="color: var(--text-secondary);">No images yet</h4>
+                    <p style="color: var(--text-secondary);">Add your first image in the admin panel!</p>
+                </div>
+            </div>
+        `;
         return;
     }
 
@@ -417,51 +435,45 @@ function loadFallbackData() {
 function loadFallbackSiteData() {
     siteData = {
         hero: {
-            headline: 'CREATIVE CONTENT',
-            subtitle: 'Social Media Strategist & Visual Storyteller',
+            headline: 'YOUR NAME HERE',
+            subtitle: 'Add your tagline in the admin panel',
             cta_primary: 'View My Work',
             cta_secondary: 'Get In Touch'
         },
         about: {
-            lead_text: 'I\'m a passionate content creator specializing in social media strategy, video production, and brand storytelling.',
-            bio_text: 'With over 5 years of experience in digital marketing, I\'ve helped brands grow their online presence through engaging visual content.',
-            profile_image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600'
+            lead_text: 'Welcome! Add your introduction text in the admin panel.',
+            bio_text: 'Click "Edit Homepage" in the admin panel to customize all the text on this website.',
+            profile_image: '' // No placeholder image
         },
         stats: {
-            campaigns: '50+',
-            campaigns_label: 'Brand Campaigns',
-            views: '10M+',
-            views_label: 'Total Views',
-            experience: '5',
-            experience_label: 'Years Experience'
+            campaigns: '0',
+            campaigns_label: 'Projects',
+            views: '0',
+            views_label: 'Views',
+            experience: '0',
+            experience_label: 'Years'
         },
         contact: {
-            headline: 'Let\'s Create Something Amazing Together',
-            subtext: 'Open for collaborations, freelance projects, and full-time opportunities.'
+            headline: 'Let\'s Work Together',
+            subtext: 'Add your contact text in the admin panel.'
         },
         social: {
             instagram: '#',
             tiktok: '#',
             linkedin: '#',
-            email: 'mailto:hello@example.com'
+            email: 'mailto:your@email.com'
+        },
+        footer: {
+            copyright: '© 2024 Your Name. All rights reserved.'
         }
     };
     applySiteData();
 }
 
 function loadFallbackContent() {
-    videoItems = [{
-        title: 'Sample Video',
-        description: 'Add your videos in admin',
-        url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-        source_type: 'url'
-    }];
-    imageItems = [{
-        title: 'Sample Image',
-        description: 'Add your images in admin',
-        url: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=800',
-        source_type: 'url'
-    }];
+    // Don't show fake placeholder content - just show empty state
+    videoItems = [];
+    imageItems = [];
     renderVideos();
     renderImages();
     setupDots();
