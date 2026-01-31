@@ -1,146 +1,21 @@
-// Admin Dashboard - Complete JavaScript
-// Manages: Content, Uploads, Site Settings, CV, and Profile
-
-let adminSupabase = null;
+// Admin Panel JavaScript
 let currentUser = null;
 let allContent = [];
-let selectedFile = null;
 
-// ==========================================
-// INITIALIZATION
-// ==========================================
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Supabase with delay to ensure library is loaded
-    setTimeout(() => {
-        initializeSupabase();
-    }, 500);
+// Initialize
+document.addEventListener('DOMContentLoaded', async function() {
+    // Check if user is logged in
+    const { data: { session } } = await window.supabaseClient.auth.getSession();
     
-    setupDropZone();
+    if (session) {
+        currentUser = session.user;
+        await checkAdminAccess();
+    } else {
+        showLogin();
+    }
 });
 
-function initializeSupabase() {
-    try {
-        // Try to get from global config first
-        if (typeof PortfolioConfig !== 'undefined' && PortfolioConfig.getSupabase) {
-            adminSupabase = PortfolioConfig.getSupabase();
-        } 
-        // Fallback: create directly
-        else if (window.supabase) {
-            adminSupabase = window.supabase.createClient(
-                'https://glnfhjudzdwetdloofvk.supabase.co',
-                'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsbmZoanVkemR3ZXRkbG9vZnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3OTE2MzcsImV4cCI6MjA4NTM2NzYzN30.74j2K1FprAH4C3d_H3b588RcRPj39EKtSV1UUskNOW0'
-            );
-        }
-
-        if (adminSupabase) {
-            console.log('✅ Supabase initialized');
-            checkSession();
-        } else {
-            console.error('❌ Failed to initialize Supabase');
-            document.getElementById('login-error').textContent = 'Failed to connect to database. Check console.';
-        }
-    } catch (error) {
-        console.error('Supabase init error:', error);
-    }
-}
-
-// ==========================================
-// AUTHENTICATION
-// ==========================================
-
-async function checkSession() {
-    try {
-        const { data: { session }, error } = await adminSupabase.auth.getSession();
-        
-        if (error) throw error;
-        
-        if (session) {
-            currentUser = session.user;
-            
-            // Verify admin status
-            const { data: profile, error: profileError } = await adminSupabase
-                .from('profiles')
-                .select('is_admin')
-                .eq('id', currentUser.id)
-                .single();
-                
-            if (profileError || !profile?.is_admin) {
-                await adminSupabase.auth.signOut();
-                showLogin();
-                if (profileError) showError('Admin access required');
-            } else {
-                showDashboard();
-                loadContent();
-            }
-        } else {
-            showLogin();
-        }
-    } catch (error) {
-        console.error('Session check error:', error);
-        showLogin();
-    }
-}
-
-async function handleLogin(e) {
-    e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    const errorDiv = document.getElementById('login-error');
-    const btn = e.target.querySelector('button');
-    
-    if (!adminSupabase) {
-        errorDiv.textContent = 'Database not ready. Please wait...';
-        return;
-    }
-    
-    // Show loading
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading"></span> Signing in...';
-    errorDiv.textContent = '';
-    
-    try {
-        const { data, error } = await adminSupabase.auth.signInWithPassword({
-            email,
-            password
-        });
-        
-        if (error) throw error;
-        
-        // Check admin status
-        const { data: profile, error: profileError } = await adminSupabase
-            .from('profiles')
-            .select('is_admin')
-            .eq('id', data.user.id)
-            .single();
-            
-        if (profileError || !profile?.is_admin) {
-            await adminSupabase.auth.signOut();
-            throw new Error('Unauthorized: Admin access only');
-        }
-        
-        currentUser = data.user;
-        showDashboard();
-        loadContent();
-        
-    } catch (error) {
-        console.error('Login error:', error);
-        errorDiv.textContent = error.message || 'Login failed';
-        btn.disabled = false;
-        btn.textContent = 'Sign In';
-    }
-}
-
-async function handleLogout() {
-    try {
-        await adminSupabase.auth.signOut();
-        currentUser = null;
-        showLogin();
-    } catch (error) {
-        console.error('Logout error:', error);
-    }
-}
-
+// Show/Hide Screens
 function showLogin() {
     document.getElementById('login-screen').classList.remove('hidden');
     document.getElementById('dashboard').classList.add('hidden');
@@ -149,64 +24,85 @@ function showLogin() {
 function showDashboard() {
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('dashboard').classList.remove('hidden');
-    
-    if (currentUser) {
-        document.getElementById('user-email').textContent = currentUser.email;
-        const avatar = document.getElementById('user-avatar');
-        if (avatar) avatar.textContent = currentUser.email[0].toUpperCase();
-    }
+    initDashboard();
 }
 
-// ==========================================
-// NAVIGATION
-// ==========================================
-
-function showSection(section, element) {
-    // Update nav active state
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.classList.remove('active');
-    });
-    if (element) element.classList.add('active');
-    
-    // Show/hide sections
-    document.querySelectorAll('.section').forEach(sec => {
-        sec.classList.remove('active');
-    });
-    
-    const targetSection = document.getElementById(`${section}-section`);
-    if (targetSection) targetSection.classList.add('active');
-    
-    // Update page title
-    const titles = {
-        'content': 'Content Management',
-        'upload': 'Add New Content',
-        'profile': 'Edit Homepage',
-        'cv': 'Edit CV & Experience'
-    };
-    const titleEl = document.getElementById('page-title');
-    if (titleEl && titles[section]) titleEl.textContent = titles[section];
-    
-    // Load data for specific sections
-    if (section === 'profile') {
-        setTimeout(loadSiteSettingsIntoForm, 100);
-    } else if (section === 'cv') {
-        setTimeout(loadCVData, 100);
-    }
-}
-
-// ==========================================
-// CONTENT MANAGEMENT (VIDEOS/IMAGES)
-// ==========================================
-
-async function loadContent() {
-    if (!adminSupabase) return;
+// Login Handler
+async function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const errorDiv = document.getElementById('login-error');
     
     try {
-        const { data, error } = await adminSupabase
+        const { data, error } = await window.supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: password
+        });
+        
+        if (error) throw error;
+        
+        currentUser = data.user;
+        await checkAdminAccess();
+        
+    } catch (error) {
+        errorDiv.textContent = error.message || 'Login failed. Please check your credentials.';
+    }
+}
+
+// Check Admin Access
+async function checkAdminAccess() {
+    try {
+        const { data: profile, error } = await window.supabaseClient
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', currentUser.id)
+            .single();
+        
+        if (error || !profile || !profile.is_admin) {
+            document.getElementById('login-error').textContent = 'Access denied. Admin privileges required.';
+            await window.supabaseClient.auth.signOut();
+            return;
+        }
+        
+        showDashboard();
+        
+    } catch (error) {
+        console.error('Admin check error:', error);
+        document.getElementById('login-error').textContent = 'Error checking admin access.';
+    }
+}
+
+// Logout
+async function handleLogout() {
+    await window.supabaseClient.auth.signOut();
+    showLogin();
+}
+
+// Initialize Dashboard
+async function initDashboard() {
+    // Set user info
+    document.getElementById('user-email').textContent = currentUser.email;
+    const avatar = document.getElementById('user-avatar');
+    avatar.textContent = currentUser.email.charAt(0).toUpperCase();
+    
+    // Load initial data
+    await loadAllContent();
+    await loadSiteSettingsIntoForm();
+    await loadCVData();
+}
+
+// ============================================
+// CONTENT MANAGEMENT
+// ============================================
+
+async function loadAllContent() {
+    try {
+        const { data, error } = await window.supabaseClient
             .from('portfolio_content')
             .select('*')
             .order('order_index', { ascending: true });
-            
+        
         if (error) throw error;
         
         allContent = data || [];
@@ -214,471 +110,371 @@ async function loadContent() {
         
     } catch (error) {
         console.error('Error loading content:', error);
-        renderContentGrid([]);
+        document.getElementById('content-grid').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">📭</div>
+                <h3>No content yet</h3>
+                <p>Start by adding your first video or image!</p>
+            </div>
+        `;
     }
 }
 
-function renderContentGrid(content) {
+function renderContentGrid(items) {
     const grid = document.getElementById('content-grid');
-    if (!grid) return;
     
-    if (content.length === 0) {
+    if (!items || items.length === 0) {
         grid.innerHTML = `
-            <div class="empty-state" style="grid-column: 1/-1;">
+            <div class="empty-state">
                 <div class="empty-state-icon">📭</div>
                 <h3>No content yet</h3>
-                <p>Click "Add New" to upload your first video or image</p>
+                <p>Click "Add New" to upload your first piece of content!</p>
             </div>
         `;
         return;
     }
     
-    grid.innerHTML = content.map(item => {
-        const thumbnail = item.thumbnail_url || getThumbnailUrl(item);
-        const isActive = item.is_active;
-        
-        return `
-            <div class="content-card" data-id="${item.id}">
-                <div class="content-preview">
-                    ${item.content_type === 'video' 
-                        ? `<img src="${thumbnail}" alt="${item.title}" onerror="this.src='https://via.placeholder.com/400x225?text=Video'" loading="lazy">`
-                        : `<img src="${thumbnail}" alt="${item.title}" onerror="this.src='https://via.placeholder.com/400x225?text=Image'" loading="lazy">`
-                    }
-                    <span class="content-type-badge">${item.content_type}</span>
-                    ${!isActive ? '<span style="position: absolute; top: 0.75rem; left: 0.75rem; padding: 0.25rem 0.75rem; background: rgba(239, 68, 68, 0.9); border-radius: 20px; font-size: 0.75rem; font-weight: 600; color: white;">DRAFT</span>' : ''}
+    grid.innerHTML = items.map(item => `
+        <div class="content-card" data-id="${item.id}">
+            <div class="content-preview">
+                ${renderPreview(item)}
+                <div class="content-type-badge">${item.content_type}</div>
+            </div>
+            <div class="content-info">
+                <h3>${item.title}</h3>
+                <p>${item.description || 'No description'}</p>
+                <div class="content-meta">
+                    <span>Order: ${item.order_index}</span>
+                    <span class="status-badge ${item.is_active ? 'status-active' : 'status-inactive'}">
+                        ${item.is_active ? 'Active' : 'Hidden'}
+                    </span>
                 </div>
-                <div class="content-info">
-                    <h3>${item.title}</h3>
-                    <p>${item.description || 'No description'}</p>
-                    <div class="content-meta">
-                        <span>${new Date(item.created_at).toLocaleDateString()}</span>
-                        <span class="status-badge ${isActive ? 'status-active' : 'status-inactive'}">
-                            ${isActive ? 'Active' : 'Inactive'}
-                        </span>
-                    </div>
-                    <div class="content-actions">
-                        <button class="btn-icon" onclick="editContent('${item.id}')" title="Edit">✏️</button>
-                        <button class="btn-icon ${isActive ? '' : 'delete'}" onclick="toggleActive('${item.id}', ${!isActive})" title="${isActive ? 'Hide' : 'Show'}">
-                            ${isActive ? '👁️' : '👁️‍🗨️'}
-                        </button>
-                        <button class="btn-icon delete" onclick="deleteContent('${item.id}')" title="Delete">🗑️</button>
-                    </div>
+                <div class="content-actions">
+                    <button class="btn-icon" onclick="editContent('${item.id}')" title="Edit">✏️</button>
+                    <button class="btn-icon delete" onclick="deleteContent('${item.id}')" title="Delete">🗑️</button>
                 </div>
             </div>
-        `;
-    }).join('');
+        </div>
+    `).join('');
 }
 
-function getThumbnailUrl(item) {
-    if (item.content_type === 'video') {
-        if (item.source_type === 'url' && item.url) {
-            if (item.url.includes('youtube') || item.url.includes('youtu.be')) {
-                const id = extractYouTubeId(item.url);
-                return id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : 'https://via.placeholder.com/400x225?text=Video';
-            }
-        }
-        return 'https://via.placeholder.com/400x225?text=Video';
+function renderPreview(item) {
+    if (item.content_type === 'image') {
+        const imageUrl = item.source_type === 'url' 
+            ? item.url 
+            : `https://glnfhjudzdwetdloofvk.supabase.co/storage/v1/object/public/portfolio-media/${item.storage_path}`;
+        return `<img src="${imageUrl}" alt="${item.title}">`;
     } else {
-        if (item.source_type === 'storage' && item.storage_path) {
-            return `https://glnfhjudzdwetdloofvk.supabase.co/storage/v1/object/public/portfolio-media/${item.storage_path}`;
+        if (item.thumbnail_url) {
+            return `<img src="${item.thumbnail_url}" alt="${item.title}">`;
         }
-        return item.url || 'https://via.placeholder.com/400x225?text=Image';
+        return `<div style="display:flex;align-items:center;justify-content:center;height:100%;background:#f5f5f5;color:#999;font-size:3rem;">🎬</div>`;
     }
 }
 
 function filterContent() {
-    const type = document.getElementById('filter-type').value;
-    const filtered = type === 'all' ? allContent : allContent.filter(item => item.content_type === type);
-    renderContentGrid(filtered);
-}
-
-// ==========================================
-// UPLOAD FUNCTIONS
-// ==========================================
-
-function switchTab(tab) {
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+    const filterType = document.getElementById('filter-type').value;
     
-    if (tab === 'link') {
-        document.getElementById('link-form').classList.remove('hidden');
-        document.getElementById('file-form').classList.add('hidden');
+    if (filterType === 'all') {
+        renderContentGrid(allContent);
     } else {
-        document.getElementById('link-form').classList.add('hidden');
-        document.getElementById('file-form').classList.remove('hidden');
+        const filtered = allContent.filter(item => item.content_type === filterType);
+        renderContentGrid(filtered);
     }
 }
 
-function toggleLinkPlaceholder() {
-    const type = document.getElementById('link-type').value;
-    const help = document.getElementById('link-help');
-    const urlInput = document.getElementById('link-url');
-    
-    if (type === 'video') {
-        help.textContent = 'Supports YouTube, Vimeo, or direct video links';
-        urlInput.placeholder = 'https://youtube.com/watch?v=...';
-    } else {
-        help.textContent = 'Direct link to image (Imgur, Cloudinary, etc)';
-        urlInput.placeholder = 'https://...';
-    }
-}
-
-function previewLink() {
-    const url = document.getElementById('link-url').value;
-    const thumbInput = document.getElementById('link-thumbnail');
-    
-    if ((url.includes('youtube') || url.includes('youtu.be')) && !thumbInput.value) {
-        const id = extractYouTubeId(url);
-        if (id) {
-            thumbInput.placeholder = `Auto: https://img.youtube.com/vi/${id}/mqdefault.jpg`;
-        }
-    }
-}
-
-async function handleLinkSubmit(e) {
-    e.preventDefault();
-    if (!adminSupabase) {
-        showError('Database not connected');
-        return;
-    }
-    
-    const btn = e.target.querySelector('button[type="submit"]');
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="loading"></span> Adding...';
-    
-    try {
-        // Auto-generate thumbnail for YouTube if not provided
-        let thumbnail = document.getElementById('link-thumbnail').value;
-        const url = document.getElementById('link-url').value;
-        
-        if (!thumbnail && url.includes('youtube')) {
-            const id = extractYouTubeId(url);
-            if (id) thumbnail = `https://img.youtube.com/vi/${id}/mqdefault.jpg`;
-        }
-        
-        const { error } = await adminSupabase
-            .from('portfolio_content')
-            .insert([{
-                title: document.getElementById('link-title').value,
-                description: document.getElementById('link-description').value,
-                content_type: document.getElementById('link-type').value,
-                source_type: 'url',
-                url: url,
-                thumbnail_url: thumbnail || null,
-                is_active: true,
-                order_index: 0
-            }]);
-            
-        if (error) throw error;
-        
-        showSuccess('✅ Content added successfully!');
-        e.target.reset();
-        loadContent();
-        showSection('content', document.querySelectorAll('.nav-item')[0]);
-        
-    } catch (error) {
-        showError(error.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-    }
-}
-
-// File Upload Handling
-function setupDropZone() {
-    const dropZone = document.getElementById('drop-zone');
-    if (!dropZone) return;
-    
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, preventDefaults, false);
-    });
-    
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-    
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => {
-            dropZone.style.borderColor = 'var(--accent)';
-            dropZone.style.background = 'rgba(255, 143, 163, 0.05)';
-        });
-    });
-    
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, () => {
-            dropZone.style.borderColor = 'var(--border)';
-            dropZone.style.background = 'var(--primary-bg)';
-        });
-    });
-    
-    dropZone.addEventListener('drop', handleDrop);
-}
-
-function handleDrop(e) {
-    const dt = e.dataTransfer;
-    const files = dt.files;
-    if (files.length) handleFile(files[0]);
-}
-
-function handleFileSelect(e) {
-    if (e.target.files.length) handleFile(e.target.files[0]);
-}
-
-function handleFile(file) {
-    const maxSize = file.type.startsWith('video/') ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
-    
-    if (file.size > maxSize) {
-        showError(`File too large. Max size: ${file.type.startsWith('video/') ? '50MB' : '10MB'}`);
-        return;
-    }
-    
-    selectedFile = file;
-    const preview = document.getElementById('file-preview');
-    if (!preview) return;
-    
-    preview.classList.remove('hidden');
-    const contentDiv = document.getElementById('preview-content');
-    
-    if (file.type.startsWith('image/')) {
-        const img = document.createElement('img');
-        img.src = URL.createObjectURL(file);
-        img.style.maxWidth = '100%';
-        img.style.borderRadius = '8px';
-        img.style.maxHeight = '200px';
-        img.style.objectFit = 'cover';
-        contentDiv.innerHTML = '';
-        contentDiv.appendChild(img);
-    } else {
-        contentDiv.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem;">
-                <span style="font-size: 2.5rem;">🎥</span>
-                <div>
-                    <div style="font-weight: 600; margin-bottom: 0.25rem;">${file.name}</div>
-                    <div style="color: var(--text-secondary); font-size: 0.875rem;">${(file.size / 1024 / 1024).toFixed(2)} MB</div>
-                </div>
-            </div>
-        `;
-    }
-}
-
-function clearFile() {
-    selectedFile = null;
-    document.getElementById('file-input').value = '';
-    document.getElementById('file-preview').classList.add('hidden');
-}
-
-function updateFileAccept() {
-    const type = document.getElementById('file-type').value;
-    const input = document.getElementById('file-input');
-    input.accept = type === 'video' ? 'video/*' : 'image/*';
-}
-
-async function handleFileSubmit(e) {
-    e.preventDefault();
-    
-    if (!adminSupabase) {
-        showError('Database not connected');
-        return;
-    }
-    
-    if (!selectedFile) {
-        showError('Please select a file first');
-        return;
-    }
-    
-    const btn = document.getElementById('upload-btn');
-    const btnText = btn.querySelector('.btn-text');
-    const loading = btn.querySelector('.loading');
-    
-    btn.disabled = true;
-    btnText.classList.add('hidden');
-    loading.classList.remove('hidden');
-    
-    try {
-        // Upload to Storage
-        const fileExt = selectedFile.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `${document.getElementById('file-type').value}s/${fileName}`;
-        
-        const { error: uploadError } = await adminSupabase.storage
-            .from('portfolio-media')
-            .upload(filePath, selectedFile);
-            
-        if (uploadError) throw uploadError;
-        
-        // Save to Database
-        const { error: dbError } = await adminSupabase
-            .from('portfolio_content')
-            .insert([{
-                title: document.getElementById('file-title').value,
-                description: document.getElementById('file-description').value,
-                content_type: document.getElementById('file-type').value,
-                source_type: 'storage',
-                storage_path: filePath,
-                is_active: true,
-                order_index: 0
-            }]);
-            
-        if (dbError) throw dbError;
-        
-        showSuccess('✅ File uploaded successfully!');
-        e.target.reset();
-        selectedFile = null;
-        document.getElementById('file-preview').classList.add('hidden');
-        loadContent();
-        showSection('content', document.querySelectorAll('.nav-item')[0]);
-        
-    } catch (error) {
-        showError(error.message);
-    } finally {
-        btn.disabled = false;
-        btnText.classList.remove('hidden');
-        loading.classList.add('hidden');
-    }
-}
-
-// ==========================================
-// EDIT/DELETE OPERATIONS
-// ==========================================
-
+// Edit Content
 function editContent(id) {
-    const item = allContent.find(c => c.id === id);
+    const item = allContent.find(i => i.id === id);
     if (!item) return;
     
-    document.getElementById('edit-id').value = id;
+    document.getElementById('edit-id').value = item.id;
     document.getElementById('edit-title').value = item.title;
     document.getElementById('edit-description').value = item.description || '';
-    document.getElementById('edit-order').value = item.order_index || 0;
+    document.getElementById('edit-order').value = item.order_index;
     document.getElementById('edit-active').checked = item.is_active;
     
     document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+async function handleEditSubmit(e) {
+    e.preventDefault();
+    
+    const id = document.getElementById('edit-id').value;
+    const updates = {
+        title: document.getElementById('edit-title').value,
+        description: document.getElementById('edit-description').value,
+        order_index: parseInt(document.getElementById('edit-order').value),
+        is_active: document.getElementById('edit-active').checked
+    };
+    
+    try {
+        const { error } = await window.supabaseClient
+            .from('portfolio_content')
+            .update(updates)
+            .eq('id', id);
+        
+        if (error) throw error;
+        
+        alert('✅ Content updated successfully!');
+        closeModal();
+        await loadAllContent();
+        
+    } catch (error) {
+        alert('❌ Error updating content: ' + error.message);
+    }
+}
+
+async function deleteContent(id) {
+    if (!confirm('Are you sure you want to delete this content? This cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const { error } = await window.supabaseClient
+            .from('portfolio_content')
+            .delete()
+            .eq('id', id);
+        
+        if (error) throw error;
+        
+        alert('✅ Content deleted successfully!');
+        await loadAllContent();
+        
+    } catch (error) {
+        alert('❌ Error deleting content: ' + error.message);
+    }
 }
 
 function closeModal() {
     document.getElementById('edit-modal').classList.add('hidden');
 }
 
-async function handleEditSubmit(e) {
+// ============================================
+// ADD NEW CONTENT
+// ============================================
+
+function switchTab(tab) {
+    const linkForm = document.getElementById('link-form');
+    const fileForm = document.getElementById('file-form');
+    const tabs = document.querySelectorAll('.tab-btn');
+    
+    tabs.forEach(t => t.classList.remove('active'));
+    
+    if (tab === 'link') {
+        linkForm.classList.remove('hidden');
+        fileForm.classList.add('hidden');
+        tabs[0].classList.add('active');
+    } else {
+        linkForm.classList.add('hidden');
+        fileForm.classList.remove('hidden');
+        tabs[1].classList.add('active');
+    }
+}
+
+function toggleLinkPlaceholder() {
+    const type = document.getElementById('link-type').value;
+    const urlInput = document.getElementById('link-url');
+    const helpText = document.getElementById('link-help');
+    
+    if (type === 'video') {
+        urlInput.placeholder = 'https://youtube.com/watch?v=...';
+        helpText.textContent = 'Paste YouTube, Vimeo, or any video link';
+    } else {
+        urlInput.placeholder = 'https://example.com/image.jpg';
+        helpText.textContent = 'Paste direct image URL (must end in .jpg, .png, etc)';
+    }
+}
+
+function previewLink() {
+    // Optional: Add live preview functionality
+}
+
+async function handleLinkSubmit(e) {
     e.preventDefault();
-    if (!adminSupabase) return;
+    
+    const contentData = {
+        content_type: document.getElementById('link-type').value,
+        title: document.getElementById('link-title').value,
+        description: document.getElementById('link-description').value,
+        source_type: 'url',
+        url: document.getElementById('link-url').value,
+        thumbnail_url: document.getElementById('link-thumbnail').value || null,
+        order_index: allContent.length,
+        is_active: true
+    };
     
     try {
-        const { error } = await adminSupabase
+        const { error } = await window.supabaseClient
             .from('portfolio_content')
-            .update({
-                title: document.getElementById('edit-title').value,
-                description: document.getElementById('edit-description').value,
-                order_index: parseInt(document.getElementById('edit-order').value),
-                is_active: document.getElementById('edit-active').checked,
-                updated_at: new Date()
-            })
-            .eq('id', document.getElementById('edit-id').value);
-            
+            .insert([contentData]);
+        
         if (error) throw error;
         
-        closeModal();
-        loadContent();
-        showSuccess('✅ Content updated!');
+        alert('✅ Content added successfully!');
+        e.target.reset();
+        showSection('content', document.querySelectorAll('.nav-item')[0]);
+        await loadAllContent();
         
     } catch (error) {
-        showError(error.message);
+        alert('❌ Error adding content: ' + error.message);
     }
 }
 
-async function toggleActive(id, active) {
-    if (!adminSupabase) return;
+// File Upload
+function updateFileAccept() {
+    const type = document.getElementById('file-type').value;
+    const input = document.getElementById('file-input');
     
-    try {
-        const { error } = await adminSupabase
-            .from('portfolio_content')
-            .update({ is_active: active })
-            .eq('id', id);
-            
-        if (error) throw error;
-        loadContent();
-        
-    } catch (error) {
-        showError(error.message);
+    if (type === 'image') {
+        input.accept = 'image/*';
+    } else {
+        input.accept = 'video/*';
     }
 }
 
-async function deleteContent(id) {
-    if (!confirm('⚠️ Are you sure you want to delete this? This action cannot be undone.')) return;
-    if (!adminSupabase) return;
+function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
     
-    try {
-        const item = allContent.find(c => c.id === id);
-        
-        // Delete from storage if it's a file
-        if (item?.source_type === 'storage' && item.storage_path) {
-            await adminSupabase.storage
-                .from('portfolio-media')
-                .remove([item.storage_path]);
-        }
-        
-        // Delete from database
-        const { error } = await adminSupabase
-            .from('portfolio_content')
-            .delete()
-            .eq('id', id);
-            
-        if (error) throw error;
-        
-        loadContent();
-        showSuccess('✅ Content deleted');
-        
-    } catch (error) {
-        showError(error.message);
+    const preview = document.getElementById('file-preview');
+    const content = document.getElementById('preview-content');
+    
+    preview.classList.remove('hidden');
+    
+    if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            content.innerHTML = `<img src="${e.target.result}" style="max-width: 100%; border-radius: 8px;">`;
+        };
+        reader.readAsDataURL(file);
+    } else if (file.type.startsWith('video/')) {
+        content.innerHTML = `<p><strong>📹 ${file.name}</strong><br><small>${(file.size / 1024 / 1024).toFixed(2)} MB</small></p>`;
     }
 }
 
-// ==========================================
-// SITE EDITOR (HOMEPAGE CONTENT)
-// ==========================================
+function clearFile() {
+    document.getElementById('file-input').value = '';
+    document.getElementById('file-preview').classList.add('hidden');
+}
 
-async function loadSiteSettingsIntoForm() {
-    if (!adminSupabase) return;
+async function handleFileSubmit(e) {
+    e.preventDefault();
+    
+    const fileInput = document.getElementById('file-input');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Please select a file first!');
+        return;
+    }
+    
+    // Show loading
+    const btn = document.getElementById('upload-btn');
+    const btnText = btn.querySelector('.btn-text');
+    const loading = btn.querySelector('.loading');
+    btnText.classList.add('hidden');
+    loading.classList.remove('hidden');
+    btn.disabled = true;
     
     try {
-        const { data, error } = await adminSupabase
-            .from('site_settings')
-            .select('*');
-            
-        if (error) throw error;
+        // Upload to Supabase Storage
+        const fileName = `${Date.now()}_${file.name}`;
+        const { data: uploadData, error: uploadError } = await window.supabaseClient.storage
+            .from('portfolio-media')
+            .upload(fileName, file);
         
-        // Mapping of DB fields to form fields
-        const fieldMap = {
-            'hero-headline': 'site-hero-headline',
-            'hero-subtitle': 'site-hero-subtitle',
-            'hero-cta_primary': 'site-hero-cta1',
-            'hero-cta_secondary': 'site-hero-cta2',
-            'about-profile_image': 'site-about-image',
-            'about-lead_text': 'site-about-lead',
-            'about-bio_text': 'site-about-bio',
-            'stats-campaigns': 'site-stat-1',
-            'stats-campaigns_label': 'site-stat-1-label',
-            'stats-views': 'site-stat-2',
-            'stats-views_label': 'site-stat-2-label',
-            'stats-experience': 'site-stat-3',
-            'stats-experience_label': 'site-stat-3-label',
-            'social-instagram': 'site-social-insta',
-            'social-tiktok': 'site-social-tiktok',
-            'social-linkedin': 'site-social-linkedin',
-            'social-email': 'site-social-email',
-            'contact-headline': 'site-contact-headline',
-            'contact-subtext': 'site-contact-subtext',
-            'footer-copyright': 'site-footer-copy'
+        if (uploadError) throw uploadError;
+        
+        // Insert record
+        const contentData = {
+            content_type: document.getElementById('file-type').value,
+            title: document.getElementById('file-title').value,
+            description: document.getElementById('file-description').value,
+            source_type: 'storage',
+            storage_path: uploadData.path,
+            order_index: allContent.length,
+            is_active: true
         };
         
+        const { error: insertError } = await window.supabaseClient
+            .from('portfolio_content')
+            .insert([contentData]);
+        
+        if (insertError) throw insertError;
+        
+        alert('✅ File uploaded successfully!');
+        e.target.reset();
+        clearFile();
+        showSection('content', document.querySelectorAll('.nav-item')[0]);
+        await loadAllContent();
+        
+    } catch (error) {
+        alert('❌ Upload error: ' + error.message);
+    } finally {
+        btnText.classList.remove('hidden');
+        loading.classList.add('hidden');
+        btn.disabled = false;
+    }
+}
+
+// ============================================
+// SITE SETTINGS EDITOR
+// ============================================
+
+async function loadSiteSettingsIntoForm() {
+    try {
+        const { data, error } = await window.supabaseClient
+            .from('site_settings')
+            .select('*');
+        
+        if (error) throw error;
+        
+        // Convert to object
+        const settings = {};
         data.forEach(item => {
-            const fieldId = fieldMap[`${item.section}-${item.key}`];
-            if (fieldId) {
-                const field = document.getElementById(fieldId);
-                if (field && item.value) field.value = item.value;
-            }
+            if (!settings[item.section]) settings[item.section] = {};
+            settings[item.section][item.key] = item.value;
         });
+        
+        // Populate form fields
+        if (settings.hero) {
+            document.getElementById('site-hero-headline').value = settings.hero.headline || '';
+            document.getElementById('site-hero-subtitle').value = settings.hero.subtitle || '';
+            document.getElementById('site-hero-cta1').value = settings.hero.cta_primary || '';
+            document.getElementById('site-hero-cta2').value = settings.hero.cta_secondary || '';
+        }
+        
+        if (settings.about) {
+            document.getElementById('site-about-image').value = settings.about.profile_image || '';
+            document.getElementById('site-about-lead').value = settings.about.lead_text || '';
+            document.getElementById('site-about-bio').value = settings.about.bio_text || '';
+        }
+        
+        if (settings.stats) {
+            document.getElementById('site-stat-1').value = settings.stats.campaigns || '';
+            document.getElementById('site-stat-1-label').value = settings.stats.campaigns_label || '';
+            document.getElementById('site-stat-2').value = settings.stats.views || '';
+            document.getElementById('site-stat-2-label').value = settings.stats.views_label || '';
+            document.getElementById('site-stat-3').value = settings.stats.experience || '';
+            document.getElementById('site-stat-3-label').value = settings.stats.experience_label || '';
+        }
+        
+        if (settings.social) {
+            document.getElementById('site-social-insta').value = settings.social.instagram || '';
+            document.getElementById('site-social-tiktok').value = settings.social.tiktok || '';
+            document.getElementById('site-social-linkedin').value = settings.social.linkedin || '';
+            document.getElementById('site-social-email').value = settings.social.email?.replace('mailto:', '') || '';
+        }
+        
+        if (settings.contact) {
+            document.getElementById('site-contact-headline').value = settings.contact.headline || '';
+            document.getElementById('site-contact-subtext').value = settings.contact.subtext || '';
+        }
+        
+        if (settings.footer) {
+            document.getElementById('site-footer-copy').value = settings.footer.copyright || '';
+        }
         
     } catch (error) {
         console.error('Error loading settings:', error);
@@ -686,227 +482,213 @@ async function loadSiteSettingsIntoForm() {
 }
 
 async function saveAllSiteSettings() {
-    if (!adminSupabase) {
-        showError('Not connected to database');
-        return;
-    }
-    
-    const settings = [
+    const settingsToSave = [
+        // Hero
         { section: 'hero', key: 'headline', value: document.getElementById('site-hero-headline').value },
         { section: 'hero', key: 'subtitle', value: document.getElementById('site-hero-subtitle').value },
         { section: 'hero', key: 'cta_primary', value: document.getElementById('site-hero-cta1').value },
         { section: 'hero', key: 'cta_secondary', value: document.getElementById('site-hero-cta2').value },
+        
+        // About
         { section: 'about', key: 'profile_image', value: document.getElementById('site-about-image').value },
         { section: 'about', key: 'lead_text', value: document.getElementById('site-about-lead').value },
         { section: 'about', key: 'bio_text', value: document.getElementById('site-about-bio').value },
+        
+        // Stats
         { section: 'stats', key: 'campaigns', value: document.getElementById('site-stat-1').value },
         { section: 'stats', key: 'campaigns_label', value: document.getElementById('site-stat-1-label').value },
         { section: 'stats', key: 'views', value: document.getElementById('site-stat-2').value },
         { section: 'stats', key: 'views_label', value: document.getElementById('site-stat-2-label').value },
         { section: 'stats', key: 'experience', value: document.getElementById('site-stat-3').value },
         { section: 'stats', key: 'experience_label', value: document.getElementById('site-stat-3-label').value },
+        
+        // Social
         { section: 'social', key: 'instagram', value: document.getElementById('site-social-insta').value },
         { section: 'social', key: 'tiktok', value: document.getElementById('site-social-tiktok').value },
         { section: 'social', key: 'linkedin', value: document.getElementById('site-social-linkedin').value },
-        { section: 'social', key: 'email', value: document.getElementById('site-social-email').value },
+        { section: 'social', key: 'email', value: 'mailto:' + document.getElementById('site-social-email').value },
+        
+        // Contact
         { section: 'contact', key: 'headline', value: document.getElementById('site-contact-headline').value },
         { section: 'contact', key: 'subtext', value: document.getElementById('site-contact-subtext').value },
+        
+        // Footer
         { section: 'footer', key: 'copyright', value: document.getElementById('site-footer-copy').value }
     ];
     
     try {
-        // Save each setting
-        for (const setting of settings) {
-            const { error } = await adminSupabase
-                .from('site_settings')
-                .upsert({ 
-                    section: setting.section, 
-                    key: setting.key, 
-                    value: setting.value,
-                    updated_at: new Date()
-                }, { onConflict: ['section', 'key'] });
-                
-            if (error) throw error;
-        }
+        // Delete existing settings
+        await window.supabaseClient.from('site_settings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
         
-        showSuccess('✅ Homepage updated! Refresh main site to see changes.');
+        // Insert new settings
+        const { error } = await window.supabaseClient
+            .from('site_settings')
+            .insert(settingsToSave);
+        
+        if (error) throw error;
+        
+        alert('✅ All homepage settings saved! Check your website to see the changes.');
+        
     } catch (error) {
-        showError('Failed to save: ' + error.message);
+        alert('❌ Error saving settings: ' + error.message);
     }
 }
 
-// ==========================================
+// ============================================
 // CV EDITOR
-// ==========================================
+// ============================================
 
-function addExperienceItem(data = null) {
-    const container = document.getElementById('cv-experience-list');
-    const div = document.createElement('div');
-    div.className = 'cv-item-edit';
-    div.innerHTML = `
-        <button type="button" class="remove-btn" onclick="this.parentElement.remove()">×</button>
-        <div class="form-row">
-            <div class="form-group">
-                <label>Years</label>
-                <input type="text" class="cv-year" placeholder="2022 - Present" value="${data?.year || ''}">
-            </div>
-            <div class="form-group">
-                <label>Job Title</label>
-                <input type="text" class="cv-title" placeholder="Senior Content Creator" value="${data?.title || ''}">
-            </div>
-        </div>
-        <div class="form-group">
-            <label>Company</label>
-            <input type="text" class="cv-company" placeholder="Company Name" value="${data?.company || ''}">
-        </div>
-        <div class="form-group">
-            <label>Description</label>
-            <textarea class="cv-desc" rows="2" placeholder="Describe your role and achievements...">${data?.description || ''}</textarea>
-        </div>
-    `;
-    container.appendChild(div);
-}
-
-function addSkillCategory(data = null) {
-    const container = document.getElementById('cv-skills-list');
-    const div = document.createElement('div');
-    div.className = 'skill-edit-item';
-    div.style.cssText = 'background: white; padding: 1.25rem; border-radius: 12px; margin-bottom: 1rem; border: 1px solid var(--border); position: relative;';
-    div.innerHTML = `
-        <button type="button" class="btn-icon delete" onclick="this.parentElement.remove()" style="position: absolute; right: 0.75rem; top: 0.75rem;">🗑️</button>
-        <input type="text" class="skill-cat-name" placeholder="Category Name (e.g., Content Creation)" value="${data?.category || ''}" style="width: 100%; margin-bottom: 0.75rem; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px;">
-        <textarea class="skill-items" placeholder="Skills separated by commas (e.g., Video Editing, Photography, Photoshop)" rows="2" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-family: inherit;">${data?.items?.join(', ') || ''}</textarea>
-    `;
-    container.appendChild(div);
-}
+let cvExperiences = [];
+let cvSkills = [];
 
 async function loadCVData() {
-    if (!adminSupabase || !currentUser) return;
-    
     try {
-        // Try to load from profiles table
-        const { data: profile, error } = await adminSupabase
+        const { data: profile, error } = await window.supabaseClient
             .from('profiles')
             .select('cv_data, cv_url')
             .eq('id', currentUser.id)
             .single();
-            
-        if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
         
-        // Clear existing
-        document.getElementById('cv-experience-list').innerHTML = '';
-        document.getElementById('cv-skills-list').innerHTML = '';
+        if (error) throw error;
         
         if (profile?.cv_data) {
-            // Load experiences
-            if (profile.cv_data.experiences && profile.cv_data.experiences.length > 0) {
-                profile.cv_data.experiences.forEach(exp => addExperienceItem(exp));
-            } else {
-                // Add one empty as template
-                addExperienceItem();
-            }
-            
-            // Load skills
-            if (profile.cv_data.skills && profile.cv_data.skills.length > 0) {
-                profile.cv_data.skills.forEach(skill => addSkillCategory(skill));
-            } else {
-                // Add default categories as templates
-                addSkillCategory({ category: 'Content Creation', items: ['Video Editing', 'Copywriting', 'Photography', 'Motion Graphics'] });
-                addSkillCategory({ category: 'Platforms', items: ['Instagram', 'TikTok', 'YouTube', 'LinkedIn'] });
-            }
-            
-            // Load CV URL
-            if (profile.cv_url) {
-                document.getElementById('cv-download-url').value = profile.cv_url;
-            }
-        } else {
-            // Add templates if no data
-            addExperienceItem();
-            addSkillCategory({ category: 'Content Creation', items: ['Video Editing', 'Copywriting', 'Photography', 'Motion Graphics'] });
-            addSkillCategory({ category: 'Platforms', items: ['Instagram', 'TikTok', 'YouTube', 'LinkedIn'] });
+            cvExperiences = profile.cv_data.experiences || [];
+            cvSkills = profile.cv_data.skills || [];
         }
+        
+        if (profile?.cv_url) {
+            document.getElementById('cv-download-url').value = profile.cv_url;
+        }
+        
+        renderCVExperiences();
+        renderCVSkills();
         
     } catch (error) {
         console.error('Error loading CV:', error);
-        // Add templates as fallback
-        addExperienceItem();
-        addSkillCategory({ category: 'Content Creation', items: ['Video Editing', 'Copywriting', 'Photography', 'Motion Graphics'] });
     }
 }
 
-async function saveCVData() {
-    if (!adminSupabase || !currentUser) {
-        showError('Not authenticated');
+function renderCVExperiences() {
+    const container = document.getElementById('cv-experience-list');
+    
+    if (cvExperiences.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No experience added yet. Click below to add your first job!</p>';
         return;
     }
     
-    // Collect experiences
-    const experiences = [];
-    document.querySelectorAll('.cv-item-edit').forEach(item => {
-        experiences.push({
-            year: item.querySelector('.cv-year').value,
-            title: item.querySelector('.cv-title').value,
-            company: item.querySelector('.cv-company').value,
-            description: item.querySelector('.cv-desc').value
-        });
+    container.innerHTML = cvExperiences.map((exp, index) => `
+        <div class="cv-item-edit">
+            <button class="remove-btn" onclick="removeExperience(${index})">×</button>
+            <div class="form-group">
+                <label>Year/Period</label>
+                <input type="text" value="${exp.year}" onchange="cvExperiences[${index}].year = this.value" placeholder="2020 - Present">
+            </div>
+            <div class="form-group">
+                <label>Job Title</label>
+                <input type="text" value="${exp.title}" onchange="cvExperiences[${index}].title = this.value" placeholder="Senior Content Creator">
+            </div>
+            <div class="form-group">
+                <label>Company</label>
+                <input type="text" value="${exp.company}" onchange="cvExperiences[${index}].company = this.value" placeholder="Company Name">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea rows="2" onchange="cvExperiences[${index}].description = this.value" placeholder="Brief description of your role...">${exp.description}</textarea>
+            </div>
+        </div>
+    `).join('');
+}
+
+function addExperienceItem() {
+    cvExperiences.push({
+        year: '2024 - Present',
+        title: 'Job Title',
+        company: 'Company Name',
+        description: 'What you did in this role...'
     });
+    renderCVExperiences();
+}
+
+function removeExperience(index) {
+    cvExperiences.splice(index, 1);
+    renderCVExperiences();
+}
+
+function renderCVSkills() {
+    const container = document.getElementById('cv-skills-list');
     
-    // Collect skills
-    const skills = [];
-    document.querySelectorAll('.skill-edit-item').forEach(item => {
-        const itemsText = item.querySelector('.skill-items').value;
-        skills.push({
-            category: item.querySelector('.skill-cat-name').value,
-            items: itemsText ? itemsText.split(',').map(s => s.trim()).filter(s => s) : []
-        });
+    if (cvSkills.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No skills added yet. Add your first skill category below!</p>';
+        return;
+    }
+    
+    container.innerHTML = cvSkills.map((skill, index) => `
+        <div class="skill-edit-item">
+            <button class="remove-btn" onclick="removeSkill(${index})">×</button>
+            <input type="text" value="${skill.category}" onchange="cvSkills[${index}].category = this.value" placeholder="Category (e.g., Video Production)">
+            <textarea rows="2" onchange="cvSkills[${index}].items = this.value" placeholder="Comma-separated skills: Premiere Pro, After Effects, DaVinci Resolve">${skill.items}</textarea>
+        </div>
+    `).join('');
+}
+
+function addSkillCategory() {
+    cvSkills.push({
+        category: 'New Category',
+        items: 'Skill 1, Skill 2, Skill 3'
     });
-    
+    renderCVSkills();
+}
+
+function removeSkill(index) {
+    cvSkills.splice(index, 1);
+    renderCVSkills();
+}
+
+async function saveCVData() {
     const cvData = {
-        experiences: experiences.filter(e => e.title),
-        skills: skills.filter(s => s.category)
+        experiences: cvExperiences,
+        skills: cvSkills
     };
     
     const cvUrl = document.getElementById('cv-download-url').value;
     
     try {
-        const { error } = await adminSupabase
+        const { error } = await window.supabaseClient
             .from('profiles')
-            .upsert({
-                id: currentUser.id,
+            .update({
                 cv_data: cvData,
-                cv_url: cvUrl,
-                updated_at: new Date()
-            }, { onConflict: 'id' });
-            
+                cv_url: cvUrl
+            })
+            .eq('id', currentUser.id);
+        
         if (error) throw error;
-        showSuccess('✅ CV saved successfully!');
+        
+        alert('✅ CV data saved successfully!');
+        
     } catch (error) {
-        showError('Failed to save CV: ' + error.message);
+        alert('❌ Error saving CV: ' + error.message);
     }
 }
 
-// ==========================================
-// UTILITY FUNCTIONS
-// ==========================================
+// ============================================
+// NAVIGATION
+// ============================================
 
-function extractYouTubeId(url) {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-}
-
-function showError(message) {
-    alert('❌ ' + message);
-}
-
-function showSuccess(message) {
-    alert('✅ ' + message);
-}
-
-// Close modal on outside click
-window.onclick = function(event) {
-    const modal = document.getElementById('edit-modal');
-    if (event.target === modal) {
-        closeModal();
-    }
+function showSection(sectionName, clickedLink) {
+    // Hide all sections
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    
+    // Show selected section
+    document.getElementById(`${sectionName}-section`).classList.add('active');
+    if (clickedLink) clickedLink.classList.add('active');
+    
+    // Update page title
+    const titles = {
+        'content': 'Content Management',
+        'upload': 'Add New Content',
+        'profile': 'Edit Homepage',
+        'cv': 'Edit CV & Resume'
+    };
+    document.getElementById('page-title').textContent = titles[sectionName] || 'Dashboard';
 }
