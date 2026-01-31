@@ -1,6 +1,7 @@
 // Site Configuration
 let siteData = {};
-let supabase;
+// supabase is already defined in config.js, just reference it
+const supabase = window.supabaseClient || window.supabase;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async function() {
@@ -524,3 +525,4 @@ window.addEventListener('resize', () => {
     updateSlider('video', 0);
     updateSlider('image', 0);
 });
+
