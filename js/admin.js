@@ -481,6 +481,55 @@ async function loadSiteSettingsIntoForm() {
     }
 }
 
+// Handle profile image upload
+async function handleProfileImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file!');
+        return;
+    }
+    
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+        alert('Image too large! Maximum size is 10MB.');
+        return;
+    }
+    
+    try {
+        // Show preview
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const preview = document.getElementById('profile-image-preview');
+            preview.querySelector('img').src = e.target.result;
+            preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+        
+        // Upload to Supabase Storage
+        const fileName = `profile_${Date.now()}_${file.name}`;
+        const { data: uploadData, error: uploadError } = await window.supabaseClient.storage
+            .from('portfolio-media')
+            .upload(fileName, file);
+        
+        if (uploadError) throw uploadError;
+        
+        // Get public URL
+        const publicUrl = `https://glnfhjudzdwetdloofvk.supabase.co/storage/v1/object/public/portfolio-media/${uploadData.path}`;
+        
+        // Set URL in input field
+        document.getElementById('site-about-image').value = publicUrl;
+        
+        alert('✅ Image uploaded! URL has been set. Click "Save All Changes" to apply.');
+        
+    } catch (error) {
+        console.error('Upload error:', error);
+        alert('❌ Upload failed: ' + error.message);
+    }
+}
+
 async function saveAllSiteSettings() {
     const settingsToSave = [
         // Hero
@@ -516,20 +565,24 @@ async function saveAllSiteSettings() {
         { section: 'footer', key: 'copyright', value: document.getElementById('site-footer-copy').value }
     ];
     
+    console.log('💾 Saving settings:', settingsToSave);
+    
     try {
         // Delete existing settings
         await window.supabaseClient.from('site_settings').delete().neq('id', '00000000-0000-0000-0000-000000000000');
         
         // Insert new settings
-        const { error } = await window.supabaseClient
+        const { data, error } = await window.supabaseClient
             .from('site_settings')
             .insert(settingsToSave);
         
         if (error) throw error;
         
-        alert('✅ All homepage settings saved! Check your website to see the changes.');
+        console.log('✅ Settings saved successfully!', data);
+        alert('✅ All homepage settings saved! Refresh your main website to see changes.\n\nTIP: Press Ctrl+Shift+R (or Cmd+Shift+R on Mac) to hard refresh.');
         
     } catch (error) {
+        console.error('❌ Save error:', error);
         alert('❌ Error saving settings: ' + error.message);
     }
 }
