@@ -1,38 +1,228 @@
-// Wait for DOM and Supabase to be ready
+// Site Configuration
+let siteData = {};
 let supabase;
-let videoIndex = 0;
-let imageIndex = 0;
-let videoItems = [];
-let imageItems = [];
-let autoSlideInterval;
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Supabase with delay to ensure library loaded
-    setTimeout(() => {
+// Initialize
+document.addEventListener('DOMContentLoaded', async function() {
+    // Show loading
+    const loadingScreen = document.getElementById('loading-screen');
+    
+    try {
+        // Initialize Supabase
         if (typeof PortfolioConfig !== 'undefined') {
             supabase = PortfolioConfig.getSupabase();
         } else if (window.supabase) {
-            // Fallback if config not loaded
             supabase = window.supabase.createClient(
                 'https://glnfhjudzdwetdloofvk.supabase.co',
                 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsbmZoanVkemR3ZXRkbG9vZnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3OTE2MzcsImV4cCI6MjA4NTM2NzYzN30.74j2K1FprAH4C3d_H3b588RcRPj39EKtSV1UUskNOW0'
             );
         }
+
+        // Load all site data
+        await loadSiteSettings();
+        await loadPortfolioContent();
+        await loadCVData();
         
-        if (supabase) {
-            loadContent();
-        } else {
-            console.error('Supabase not loaded');
-            loadFallbackContent();
+        // Hide loading screen
+        if (loadingScreen) {
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => loadingScreen.remove(), 500);
         }
-    }, 100);
-    
-    setupMobileNav();
-    setupScrollAnimations();
+        
+        // Setup interactions
+        setupMobileNav();
+        setupScrollAnimations();
+        startAutoSlide();
+        
+    } catch (error) {
+        console.error('Initialization error:', error);
+        // Load fallback data if Supabase fails
+        loadFallbackData();
+        if (loadingScreen) loadingScreen.remove();
+    }
 });
 
-// Load content from Supabase
-async function loadContent() {
+// Load Site Settings
+async function loadSiteSettings() {
+    try {
+        const { data, error } = await supabase
+            .from('site_settings')
+            .select('*');
+            
+        if (error) throw error;
+        
+        // Convert to easy-to-use object
+        siteData = {};
+        data.forEach(item => {
+            if (!siteData[item.section]) siteData[item.section] = {};
+            siteData[item.section][item.key] = item.value;
+        });
+        
+        applySiteData();
+        
+    } catch (error) {
+        console.error('Error loading settings:', error);
+        loadFallbackSiteData();
+    }
+}
+
+// Apply loaded data to DOM
+function applySiteData() {
+    // Hero Section
+    if (siteData.hero) {
+        const headline = document.getElementById('hero-headline');
+        if (headline && siteData.hero.headline) {
+            headline.textContent = siteData.hero.headline;
+            headline.setAttribute('data-text', siteData.hero.headline);
+        }
+        
+        const subtitle = document.getElementById('hero-subtitle');
+        if (subtitle && siteData.hero.subtitle) subtitle.textContent = siteData.hero.subtitle;
+        
+        const ctaPrimary = document.getElementById('hero-cta-primary');
+        if (ctaPrimary && siteData.hero.cta_primary) ctaPrimary.textContent = siteData.hero.cta_primary;
+        
+        const ctaSecondary = document.getElementById('hero-cta-secondary');
+        if (ctaSecondary && siteData.hero.cta_secondary) ctaSecondary.textContent = siteData.hero.cta_secondary;
+        
+        document.title = siteData.hero.headline || 'Creative Portfolio';
+    }
+    
+    // About Section
+    if (siteData.about) {
+        const lead = document.getElementById('about-lead');
+        if (lead && siteData.about.lead_text) lead.textContent = siteData.about.lead_text;
+        
+        const bio = document.getElementById('about-bio');
+        if (bio && siteData.about.bio_text) bio.textContent = siteData.about.bio_text;
+        
+        const profileImg = document.getElementById('profile-image');
+        if (profileImg && siteData.about.profile_image) {
+            profileImg.src = siteData.about.profile_image;
+            profileImg.onerror = function() {
+                this.src = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600';
+            };
+        }
+    }
+    
+    // Stats
+    if (siteData.stats) {
+        const statsContainer = document.getElementById('stats-container');
+        if (statsContainer) {
+            statsContainer.innerHTML = `
+                <div class="stat-item">
+                    <span class="stat-number">${siteData.stats.campaigns || '50+'}</span>
+                    <span class="stat-label">${siteData.stats.campaigns_label || 'Brand Campaigns'}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">${siteData.stats.views || '10M+'}</span>
+                    <span class="stat-label">${siteData.stats.views_label || 'Total Views'}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">${siteData.stats.experience || '5'}</span>
+                    <span class="stat-label">${siteData.stats.experience_label || 'Years Experience'}</span>
+                </div>
+            `;
+        }
+    }
+    
+    // Contact Section
+    if (siteData.contact) {
+        const headline = document.getElementById('contact-headline');
+        if (headline && siteData.contact.headline) {
+            headline.innerHTML = siteData.contact.headline.replace(
+                'Amazing', 
+                '<span class="highlight">Amazing</span>'
+            );
+        }
+        
+        const subtext = document.getElementById('contact-subtext');
+        if (subtext && siteData.contact.subtext) subtext.textContent = siteData.contact.subtext;
+    }
+    
+    // Social Links
+    if (siteData.social) {
+        const container = document.getElementById('social-links-container');
+        if (container) {
+            let html = '';
+            if (siteData.social.instagram) {
+                html += `<a href="${siteData.social.instagram}" class="social-link" target="_blank">Instagram</a>`;
+            }
+            if (siteData.social.tiktok) {
+                html += `<a href="${siteData.social.tiktok}" class="social-link" target="_blank">TikTok</a>`;
+            }
+            if (siteData.social.linkedin) {
+                html += `<a href="${siteData.social.linkedin}" class="social-link" target="_blank">LinkedIn</a>`;
+            }
+            if (siteData.social.email) {
+                html += `<a href="${siteData.social.email}" class="social-link">Email</a>`;
+            }
+            container.innerHTML = html;
+        }
+    }
+    
+    // Footer
+    if (siteData.footer) {
+        const copyright = document.getElementById('footer-copyright');
+        if (copyright && siteData.footer.copyright) copyright.textContent = siteData.footer.copyright;
+    }
+}
+
+// Load CV/Experience Data
+async function loadCVData() {
+    try {
+        // Try to load from profiles or cv_data table
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .limit(1)
+            .single();
+            
+        if (profile) {
+            // Update CV timeline if you have cv_data in profile
+            const timeline = document.getElementById('cv-timeline');
+            if (timeline && profile.cv_data) {
+                const cv = profile.cv_data;
+                let html = '';
+                if (cv.experiences) {
+                    cv.experiences.forEach(exp => {
+                        html += `
+                            <div class="timeline-item">
+                                <div class="timeline-marker"></div>
+                                <div class="timeline-content">
+                                    <span class="timeline-date">${exp.year}</span>
+                                    <h4>${exp.title}</h4>
+                                    <p class="company">${exp.company}</p>
+                                    <p>${exp.description}</p>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+                timeline.innerHTML = html;
+            }
+            
+            // Update CV download link
+            const cvBtn = document.getElementById('cv-download-btn');
+            if (cvBtn && profile.cv_url) {
+                cvBtn.href = profile.cv_url;
+                cvBtn.target = '_blank';
+            }
+        }
+        
+    } catch (error) {
+        console.log('CV data not loaded, using defaults');
+        loadFallbackCV();
+    }
+}
+
+// Load Portfolio Content (Videos/Images)
+let videoIndex = 0;
+let imageIndex = 0;
+let videoItems = [];
+let imageItems = [];
+
+async function loadPortfolioContent() {
     try {
         const { data, error } = await supabase
             .from('portfolio_content')
@@ -48,7 +238,6 @@ async function loadContent() {
         renderVideos();
         renderImages();
         setupDots();
-        startAutoSlide();
 
     } catch (error) {
         console.error('Error loading content:', error);
@@ -123,35 +312,7 @@ function renderImages() {
     }).join('');
 }
 
-function extractYouTubeId(url) {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-}
-
-function extractVimeoId(url) {
-    const regExp = /vimeo\.com\/(\d+)/;
-    const match = url.match(regExp);
-    return match ? match[1] : null;
-}
-
-function loadFallbackContent() {
-    videoItems = [{
-        title: 'Fashion Campaign',
-        description: 'Summer 2024 collection showcase',
-        url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-        source_type: 'url'
-    }];
-    imageItems = [
-        {title: 'Editorial Shoot', description: 'Magazine feature', url: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=800', source_type: 'url'},
-        {title: 'Brand Collab', description: 'Beauty partnership', url: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=800', source_type: 'url'}
-    ];
-    renderVideos();
-    renderImages();
-    setupDots();
-    startAutoSlide();
-}
-
+// Slider Functions
 function slideContent(type, direction) {
     const items = type === 'video' ? videoItems : imageItems;
     const visibleItems = window.innerWidth <= 968 ? 1 : 2;
@@ -182,7 +343,6 @@ function setupDots() {
 function setupDotContainer(type, items) {
     const dotsContainer = document.getElementById(`${type}-dots`);
     if (!dotsContainer) return;
-    
     const visibleItems = window.innerWidth <= 968 ? 1 : 2;
     const dotCount = Math.max(1, items.length - visibleItems + 1);
     
@@ -208,17 +368,107 @@ function goToSlide(type, index) {
 }
 
 function startAutoSlide() {
-    if (autoSlideInterval) clearInterval(autoSlideInterval);
-    autoSlideInterval = setInterval(() => {
+    setInterval(() => {
         if (imageItems.length <= 1) return;
         const visibleItems = window.innerWidth <= 968 ? 1 : 2;
         imageIndex++;
         if (imageIndex > imageItems.length - visibleItems) imageIndex = 0;
         updateSlider('image', imageIndex);
         updateDots('image', imageIndex);
-    }, 4000);
+    }, 5000);
 }
 
+// Utility Functions
+function extractYouTubeId(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : 'dQw4w9WgXcQ';
+}
+
+function extractVimeoId(url) {
+    const regExp = /vimeo\.com\/(\d+)/;
+    const match = url.match(regExp);
+    return match ? match[1] : '76979871';
+}
+
+// Fallback Data
+function loadFallbackData() {
+    loadFallbackSiteData();
+    loadFallbackContent();
+    loadFallbackCV();
+}
+
+function loadFallbackSiteData() {
+    siteData = {
+        hero: {
+            headline: 'CREATIVE CONTENT',
+            subtitle: 'Social Media Strategist & Visual Storyteller',
+            cta_primary: 'View My Work',
+            cta_secondary: 'Get In Touch'
+        },
+        about: {
+            lead_text: 'I\'m a passionate content creator specializing in social media strategy, video production, and brand storytelling.',
+            bio_text: 'With over 5 years of experience in digital marketing, I\'ve helped brands grow their online presence through engaging visual content.',
+            profile_image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600'
+        },
+        stats: {
+            campaigns: '50+',
+            campaigns_label: 'Brand Campaigns',
+            views: '10M+',
+            views_label: 'Total Views',
+            experience: '5',
+            experience_label: 'Years Experience'
+        },
+        contact: {
+            headline: 'Let\'s Create Something Amazing Together',
+            subtext: 'Open for collaborations, freelance projects, and full-time opportunities.'
+        },
+        social: {
+            instagram: '#',
+            tiktok: '#',
+            linkedin: '#',
+            email: 'mailto:hello@example.com'
+        }
+    };
+    applySiteData();
+}
+
+function loadFallbackContent() {
+    videoItems = [{
+        title: 'Sample Video',
+        description: 'Add your videos in admin',
+        url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
+        source_type: 'url'
+    }];
+    imageItems = [{
+        title: 'Sample Image',
+        description: 'Add your images in admin',
+        url: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=800',
+        source_type: 'url'
+    }];
+    renderVideos();
+    renderImages();
+    setupDots();
+}
+
+function loadFallbackCV() {
+    const timeline = document.getElementById('cv-timeline');
+    if (timeline) {
+        timeline.innerHTML = `
+            <div class="timeline-item">
+                <div class="timeline-marker"></div>
+                <div class="timeline-content">
+                    <span class="timeline-date">2022 - Present</span>
+                    <h4>Senior Content Creator</h4>
+                    <p class="company">Creative Agency</p>
+                    <p>Add your experience in the admin panel.</p>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// UI Interactions
 function setupMobileNav() {
     const hamburger = document.querySelector('.hamburger');
     const navLinks = document.querySelector('.nav-links');
@@ -232,11 +482,7 @@ function setupMobileNav() {
 }
 
 function setupScrollAnimations() {
-    const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px'
-    };
-
+    const observerOptions = { threshold: 0.1, rootMargin: '0px 0px -50px 0px' };
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
@@ -257,25 +503,18 @@ function setupScrollAnimations() {
 function handleContactSubmit(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button');
-    const originalText = btn.innerText;
-    
     btn.innerHTML = '<span class="loading"></span> Sending...';
     btn.disabled = true;
-
     setTimeout(() => {
-        btn.innerText = 'Sent!';
+        btn.textContent = 'Message Sent!';
         btn.style.background = 'var(--gradient-2)';
         e.target.reset();
         setTimeout(() => {
-            btn.innerText = originalText;
+            btn.textContent = 'Send Message';
             btn.style.background = '';
             btn.disabled = false;
         }, 2000);
     }, 1000);
-}
-
-function downloadCV() {
-    alert('Add your CV PDF link here!');
 }
 
 window.addEventListener('resize', () => {
