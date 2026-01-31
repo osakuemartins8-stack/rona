@@ -231,8 +231,20 @@
                     <div class="editor-block">
                         <h3>👤 About Section</h3>
                         <div class="form-group">
-                            <label>Profile Image URL</label>
-                            <input type="url" id="site-about-image" placeholder="https://your-image-url.jpg">
+                            <label>Profile Image</label>
+<div style="display: flex; gap: 1rem;">
+    <div style="flex: 1;">
+        <input type="url" id="site-about-image" placeholder="...">
+        <small>Paste URL OR upload below</small>
+    </div>
+    <div>
+        <input type="file" id="profile-image-upload" accept="image/*" style="display: none;" onchange="handleProfileImageUpload(event)">
+        <button type="button" class="btn-secondary" onclick="document.getElementById('profile-image-upload').click()">📤 Upload</button>
+    </div>
+</div>
+<div id="profile-image-preview" style="display: none; margin-top: 1rem;">
+    <img src="" style="max-width: 200px; border-radius: 12px;">
+</div>
                             <small class="help-text">Paste a direct link to your photo (from Instagram, Imgur, Cloudinary, etc)</small>
                         </div>
                         <div class="form-group">
@@ -408,3 +420,4 @@
     </div>
 </body>
 </html>
+
