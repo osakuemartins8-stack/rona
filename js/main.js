@@ -1,45 +1,63 @@
+// ==========================================
+// SUPABASE INITIALIZATION (ONLY DECLARED HERE)
+// ==========================================
+const SUPABASE_URL = 'https://glnfhjudzdwetdloofvk.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsbmZoanVkemR3ZXRkbG9vZnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3OTE2MzcsImV4cCI6MjA4NTM2NzYzN30.74j2K1FprAH4C3d_H3b588RcRPj39EKtSV1UUskNOW0';
+
+// Initialize Supabase client (only once, globally)
+let supabase;
+
+try {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log('✅ Supabase initialized');
+} catch (e) {
+    console.error('❌ Supabase init failed:', e);
+}
+
 // Site Configuration
 let siteData = {};
-// supabase is already defined in config.js, just reference it
-const supabase = window.supabaseClient || window.supabase;
 
-// Initialize
+// ==========================================
+// INITIALIZE ON PAGE LOAD
+// ==========================================
 document.addEventListener('DOMContentLoaded', async function() {
-    // Show loading
     const loadingScreen = document.getElementById('loading-screen');
     
+    // Check if Supabase loaded
+    if (!supabase) {
+        console.error('Supabase failed to load');
+        loadFallbackData();
+        if (loadingScreen) loadingScreen.remove();
+        return;
+    }
+    
     try {
-                // Supabase already initialized in config.js
-        if (!supabase) {
-            console.error('Supabase not loaded');
-            return;
-        }
-
-        // Load all site data
+        // Load all data
         await loadSiteSettings();
         await loadPortfolioContent();
         await loadCVData();
         
-        // Hide loading screen
+        // Hide loading
         if (loadingScreen) {
             loadingScreen.style.opacity = '0';
             setTimeout(() => loadingScreen.remove(), 500);
         }
         
-        // Setup interactions
+        // Setup UI
         setupMobileNav();
         setupScrollAnimations();
         startAutoSlide();
         
     } catch (error) {
         console.error('Initialization error:', error);
-        // Load fallback data if Supabase fails
         loadFallbackData();
         if (loadingScreen) loadingScreen.remove();
     }
 });
 
-// Load Site Settings
+// ==========================================
+// SITE SETTINGS / CONTENT LOADING
+// ==========================================
 async function loadSiteSettings() {
     try {
         const { data, error } = await supabase
@@ -48,12 +66,14 @@ async function loadSiteSettings() {
             
         if (error) throw error;
         
-        // Convert to easy-to-use object
+        // Convert to object
         siteData = {};
-        data.forEach(item => {
-            if (!siteData[item.section]) siteData[item.section] = {};
-            siteData[item.section][item.key] = item.value;
-        });
+        if (data) {
+            data.forEach(item => {
+                if (!siteData[item.section]) siteData[item.section] = {};
+                siteData[item.section][item.key] = item.value;
+            });
+        }
         
         applySiteData();
         
@@ -63,9 +83,8 @@ async function loadSiteSettings() {
     }
 }
 
-// Apply loaded data to DOM
 function applySiteData() {
-    // Hero Section
+    // Hero
     if (siteData.hero) {
         const headline = document.getElementById('hero-headline');
         if (headline && siteData.hero.headline) {
@@ -76,16 +95,16 @@ function applySiteData() {
         const subtitle = document.getElementById('hero-subtitle');
         if (subtitle && siteData.hero.subtitle) subtitle.textContent = siteData.hero.subtitle;
         
-        const ctaPrimary = document.getElementById('hero-cta-primary');
-        if (ctaPrimary && siteData.hero.cta_primary) ctaPrimary.textContent = siteData.hero.cta_primary;
+        const cta1 = document.getElementById('hero-cta-primary');
+        if (cta1 && siteData.hero.cta_primary) cta1.textContent = siteData.hero.cta_primary;
         
-        const ctaSecondary = document.getElementById('hero-cta-secondary');
-        if (ctaSecondary && siteData.hero.cta_secondary) ctaSecondary.textContent = siteData.hero.cta_secondary;
+        const cta2 = document.getElementById('hero-cta-secondary');
+        if (cta2 && siteData.hero.cta_secondary) cta2.textContent = siteData.hero.cta_secondary;
         
         document.title = siteData.hero.headline || 'Creative Portfolio';
     }
     
-    // About Section
+    // About
     if (siteData.about) {
         const lead = document.getElementById('about-lead');
         if (lead && siteData.about.lead_text) lead.textContent = siteData.about.lead_text;
@@ -123,7 +142,7 @@ function applySiteData() {
         }
     }
     
-    // Contact Section
+    // Contact
     if (siteData.contact) {
         const headline = document.getElementById('contact-headline');
         if (headline && siteData.contact.headline) {
@@ -137,7 +156,7 @@ function applySiteData() {
         if (subtext && siteData.contact.subtext) subtext.textContent = siteData.contact.subtext;
     }
     
-    // Social Links
+    // Social
     if (siteData.social) {
         const container = document.getElementById('social-links-container');
         if (container) {
@@ -152,7 +171,8 @@ function applySiteData() {
                 html += `<a href="${siteData.social.linkedin}" class="social-link" target="_blank">LinkedIn</a>`;
             }
             if (siteData.social.email) {
-                html += `<a href="${siteData.social.email}" class="social-link">Email</a>`;
+                const emailLink = siteData.social.email.startsWith('mailto:') ? siteData.social.email : `mailto:${siteData.social.email}`;
+                html += `<a href="${emailLink}" class="social-link">Email</a>`;
             }
             container.innerHTML = html;
         }
@@ -165,55 +185,9 @@ function applySiteData() {
     }
 }
 
-// Load CV/Experience Data
-async function loadCVData() {
-    try {
-        // Try to load from profiles or cv_data table
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .limit(1)
-            .single();
-            
-        if (profile) {
-            // Update CV timeline if you have cv_data in profile
-            const timeline = document.getElementById('cv-timeline');
-            if (timeline && profile.cv_data) {
-                const cv = profile.cv_data;
-                let html = '';
-                if (cv.experiences) {
-                    cv.experiences.forEach(exp => {
-                        html += `
-                            <div class="timeline-item">
-                                <div class="timeline-marker"></div>
-                                <div class="timeline-content">
-                                    <span class="timeline-date">${exp.year}</span>
-                                    <h4>${exp.title}</h4>
-                                    <p class="company">${exp.company}</p>
-                                    <p>${exp.description}</p>
-                                </div>
-                            </div>
-                        `;
-                    });
-                }
-                timeline.innerHTML = html;
-            }
-            
-            // Update CV download link
-            const cvBtn = document.getElementById('cv-download-btn');
-            if (cvBtn && profile.cv_url) {
-                cvBtn.href = profile.cv_url;
-                cvBtn.target = '_blank';
-            }
-        }
-        
-    } catch (error) {
-        console.log('CV data not loaded, using defaults');
-        loadFallbackCV();
-    }
-}
-
-// Load Portfolio Content (Videos/Images)
+// ==========================================
+// PORTFOLIO CONTENT (VIDEOS/IMAGES)
+// ==========================================
 let videoIndex = 0;
 let imageIndex = 0;
 let videoItems = [];
@@ -229,8 +203,8 @@ async function loadPortfolioContent() {
 
         if (error) throw error;
 
-        videoItems = data.filter(item => item.content_type === 'video');
-        imageItems = data.filter(item => item.content_type === 'image');
+        videoItems = data ? data.filter(item => item.content_type === 'video') : [];
+        imageItems = data ? data.filter(item => item.content_type === 'image') : [];
 
         renderVideos();
         renderImages();
@@ -247,7 +221,7 @@ function renderVideos() {
     if (!track) return;
 
     if (videoItems.length === 0) {
-        track.innerHTML = '<div class="content-item"><div class="content-info"><h4>No videos yet</h4><p>Check back soon!</p></div></div>';
+        track.innerHTML = '<div class="content-item"><div class="content-info"><h4>No videos yet</h4><p>Add videos from the admin panel!</p></div></div>';
         return;
     }
 
@@ -288,7 +262,7 @@ function renderImages() {
     if (!track) return;
 
     if (imageItems.length === 0) {
-        track.innerHTML = '<div class="content-item"><div class="image-container"><img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600" alt="Placeholder"></div><div class="content-info"><h4>Summer Collection</h4><p>Coming soon</p></div></div>';
+        track.innerHTML = '<div class="content-item"><div class="image-container"><img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600" alt="Placeholder"></div><div class="content-info"><h4>No images yet</h4><p>Add images from the admin panel!</p></div></div>';
         return;
     }
 
@@ -309,7 +283,53 @@ function renderImages() {
     }).join('');
 }
 
-// Slider Functions
+// ==========================================
+// CV DATA
+// ==========================================
+async function loadCVData() {
+    try {
+        const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('cv_data, cv_url')
+            .limit(1)
+            .single();
+            
+        if (error && error.code !== 'PGRST116') throw error;
+        
+        const timeline = document.getElementById('cv-timeline');
+        if (timeline && profile?.cv_data?.experiences) {
+            let html = '';
+            profile.cv_data.experiences.forEach(exp => {
+                html += `
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <span class="timeline-date">${exp.year}</span>
+                            <h4>${exp.title}</h4>
+                            <p class="company">${exp.company}</p>
+                            <p>${exp.description}</p>
+                        </div>
+                    </div>
+                `;
+            });
+            timeline.innerHTML = html;
+        }
+        
+        const cvBtn = document.getElementById('cv-download-btn');
+        if (cvBtn && profile?.cv_url) {
+            cvBtn.href = profile.cv_url;
+            cvBtn.target = '_blank';
+        }
+        
+    } catch (error) {
+        console.log('Using default CV data');
+        loadFallbackCV();
+    }
+}
+
+// ==========================================
+// SLIDER FUNCTIONS
+// ==========================================
 function slideContent(type, direction) {
     const items = type === 'video' ? videoItems : imageItems;
     const visibleItems = window.innerWidth <= 968 ? 1 : 2;
@@ -375,7 +395,9 @@ function startAutoSlide() {
     }, 5000);
 }
 
-// Utility Functions
+// ==========================================
+// UTILITIES
+// ==========================================
 function extractYouTubeId(url) {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
     const match = url.match(regExp);
@@ -388,7 +410,9 @@ function extractVimeoId(url) {
     return match ? match[1] : '76979871';
 }
 
-// Fallback Data
+// ==========================================
+// FALLBACK DATA (When Supabase fails)
+// ==========================================
 function loadFallbackData() {
     loadFallbackSiteData();
     loadFallbackContent();
@@ -404,7 +428,7 @@ function loadFallbackSiteData() {
             cta_secondary: 'Get In Touch'
         },
         about: {
-            lead_text: 'I\'m a passionate content creator specializing in social media strategy, video production, and brand storytelling.',
+            lead_text: "I'm a passionate content creator specializing in social media strategy, video production, and brand storytelling.",
             bio_text: 'With over 5 years of experience in digital marketing, I\'ve helped brands grow their online presence through engaging visual content.',
             profile_image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600'
         },
@@ -417,14 +441,17 @@ function loadFallbackSiteData() {
             experience_label: 'Years Experience'
         },
         contact: {
-            headline: 'Let\'s Create Something Amazing Together',
+            headline: "Let's Create Something Amazing Together",
             subtext: 'Open for collaborations, freelance projects, and full-time opportunities.'
         },
         social: {
-            instagram: '#',
-            tiktok: '#',
-            linkedin: '#',
+            instagram: 'https://instagram.com',
+            tiktok: 'https://tiktok.com',
+            linkedin: 'https://linkedin.com',
             email: 'mailto:hello@example.com'
+        },
+        footer: {
+            copyright: '© 2024 Creative Portfolio. All rights reserved.'
         }
     };
     applySiteData();
@@ -432,14 +459,14 @@ function loadFallbackSiteData() {
 
 function loadFallbackContent() {
     videoItems = [{
-        title: 'Sample Video',
-        description: 'Add your videos in admin',
+        title: 'Welcome Video',
+        description: 'Add your own videos in the admin panel',
         url: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
         source_type: 'url'
     }];
     imageItems = [{
-        title: 'Sample Image',
-        description: 'Add your images in admin',
+        title: 'Sample Work',
+        description: 'Add your portfolio images in the admin panel',
         url: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=800',
         source_type: 'url'
     }];
@@ -458,14 +485,25 @@ function loadFallbackCV() {
                     <span class="timeline-date">2022 - Present</span>
                     <h4>Senior Content Creator</h4>
                     <p class="company">Creative Agency</p>
-                    <p>Add your experience in the admin panel.</p>
+                    <p>Leading social media strategy and content creation for major brands.</p>
+                </div>
+            </div>
+            <div class="timeline-item">
+                <div class="timeline-marker"></div>
+                <div class="timeline-content">
+                    <span class="timeline-date">2020 - 2022</span>
+                    <h4>Content Strategist</h4>
+                    <p class="company">Digital Studio</p>
+                    <p>Developed viral campaigns and grew social media accounts.</p>
                 </div>
             </div>
         `;
     }
 }
 
-// UI Interactions
+// ==========================================
+// UI INTERACTIONS
+// ==========================================
 function setupMobileNav() {
     const hamburger = document.querySelector('.hamburger');
     const navLinks = document.querySelector('.nav-links');
@@ -500,14 +538,16 @@ function setupScrollAnimations() {
 function handleContactSubmit(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button');
+    const originalText = btn.textContent;
     btn.innerHTML = '<span class="loading"></span> Sending...';
     btn.disabled = true;
+    
     setTimeout(() => {
         btn.textContent = 'Message Sent!';
         btn.style.background = 'var(--gradient-2)';
         e.target.reset();
         setTimeout(() => {
-            btn.textContent = 'Send Message';
+            btn.textContent = originalText;
             btn.style.background = '';
             btn.disabled = false;
         }, 2000);
@@ -521,5 +561,3 @@ window.addEventListener('resize', () => {
     updateSlider('video', 0);
     updateSlider('image', 0);
 });
-
-
